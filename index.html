@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congress Voting Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Congressperson Scoring Dashboard</h1>
+        <p>Select a representative to view their Left/Right voting scores by issue.</p>
+        <p><em>Score Scale: -100 (Far Left) to +100 (Far Right)</em></p>
+    </div>
+
+    <div class="controls">
+        <select id="congressSelect">
+            <option value="repA">Representative A (Pretend Democrat)</option>
+            <option value="repB">Representative B (Pretend Republican)</option>
+            <option value="repC">Representative C (Pretend Moderate)</option>
+        </select>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="scoreChart"></canvas>
+    </div>
+
+    <script>
+        // The issues based on the project proposal
+        const issues = [
+            "Immigration", 
+            "Healthcare", 
+            "Taxes/spending/budget", 
+            "Education", 
+            "Climate/environment", 
+            "Nominations", 
+            "Entitlements (welfare)", 
+            "Military/national security", 
+            "Technology", 
+            "Business/employment", 
+            "Miscellaneous"
+        ];
+
+        // Dummy data for when the backend is ready
+        // Scores range from -100 (Left) to 100 (Right)
+        const dummyData = {
+            repA: [-80, -90, -75, -85, -95, -90, -80, -20, -10, -30, -10],
+            repB: [85, 90, 80, 70, 75, 95, 80, 90, 40, 85, 20],
+            repC: [-10, 20, 5, -15, -30, 40, 0, 50, 10, 25, 0]
+        };
+
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        let currentChart;
+
+        function renderChart(data) {
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            currentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: issues,
+                    datasets: [{
+                        label: 'Left (-100) / Right (+100) Score',
+                        data: data,
+                        backgroundColor: data.map(score => score < 0 ? 'rgba(54, 162, 235, 0.7)' : 'rgba(255, 99, 132, 0.7)'),
+                        borderColor: data.map(score => score < 0 ? 'rgba(54, 162, 235, 1)' : 'rgba(255, 99, 132, 1)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Makes it a horizontal bar chart
+                    responsive: true,
+                    scales: {
+                        x: {
+                            min: -100,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Ideological Score'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.raw;
+                                    let side = val < 0 ? "Left" : (val > 0 ? "Right" : "Center");
+                                    return `Score: ${val} (${side})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize chart with the first representative's data
+        renderChart(dummyData.repA);
+
+        // Event listener for the dropdown menu
+        document.getElementById('congressSelect').addEventListener('change', function(e) {
+            const selectedRep = e.target.value;
+            renderChart(dummyData[selectedRep]);
+        });
+    </script>
+</body>
+</html>
