@@ -10,7 +10,7 @@
             font-family: Arial, sans-serif;
             background-color: #f4f4f9;
             color: #333;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -34,6 +34,69 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .section-title {
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #444;
+        }
+        .section-subtitle {
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+            margin-bottom: 16px;
+        }
+
+        /* ── Dot Plot ── */
+        #dotPlotWrapper {
+            background: white;
+            padding: 20px 20px 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        #dotPlotSvg {
+            display: block;
+            width: 100%;
+        }
+
+        /* Tooltip */
+        #dpTooltip {
+            position: fixed;
+            background: rgba(30,30,30,0.88);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        /* Legend */
+        .dot-legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+        .dot-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #555;
+        }
+        .dot-legend-circle {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
         }
     </style>
 </head>
@@ -41,9 +104,12 @@
 
     <div class="header">
         <h1>Congressperson Scoring Dashboard</h1>
-        <p>Select a representative to view their Left/Right voting scores by issue.</p>
-        <p><em>Score Scale: -100 (Far Left) to +100 (Far Right)</em></p>
+        <p><em>Score Scale: &minus;100 (Far Left / Always votes Democrat) to +100 (Far Right / Always votes Republican)</em></p>
     </div>
+
+    <!-- ── Chart 1: Individual Bar Chart ── -->
+    <div class="section-title">Individual Score Breakdown</div>
+    <div class="section-subtitle">Select a representative to view their scores by issue.</div>
 
     <div class="controls">
         <select id="congressSelect">
@@ -57,69 +123,88 @@
         <canvas id="scoreChart"></canvas>
     </div>
 
+    <!-- ── Chart 2: All-Member Dot Plot ── -->
+    <div class="section-title">All Members by Issue</div>
+    <div class="section-subtitle">Each dot is one member of Congress. Hover for details.</div>
+
+    <div id="dotPlotWrapper">
+        <svg id="dotPlotSvg"></svg>
+        <div class="dot-legend">
+            <div class="dot-legend-item">
+                <span class="dot-legend-circle" style="background:#3a86ff;"></span> Rep. A (Pretend Democrat)
+            </div>
+            <div class="dot-legend-item">
+                <span class="dot-legend-circle" style="background:#ef233c;"></span> Rep. B (Pretend Republican)
+            </div>
+            <div class="dot-legend-item">
+                <span class="dot-legend-circle" style="background:#8338ec;"></span> Rep. C (Pretend Moderate)
+            </div>
+        </div>
+    </div>
+
+    <div id="dpTooltip"></div>
+
     <script>
-        // The issues based on the project proposal
+        // ── Shared data ──────────────────────────────────────────────
         const issues = [
-            "Immigration", 
-            "Healthcare", 
-            "Taxes/spending/budget", 
-            "Education", 
-            "Climate/environment", 
-            "Nominations", 
-            "Entitlements (welfare)", 
-            "Military/national security", 
-            "Technology", 
-            "Business/employment", 
+            "Immigration",
+            "Healthcare",
+            "Taxes/spending/budget",
+            "Education",
+            "Climate/environment",
+            "Nominations",
+            "Entitlements (welfare)",
+            "Military/national security",
+            "Technology",
+            "Business/employment",
             "Miscellaneous"
         ];
 
-        // Dummy data for when the backend is ready
-        // Scores range from -100 (Left) to 100 (Right)
         const dummyData = {
             repA: [-80, -90, -75, -85, -95, -90, -80, -20, -10, -30, -10],
-            repB: [85, 90, 80, 70, 75, 95, 80, 90, 40, 85, 20],
-            repC: [-10, 20, 5, -15, -30, 40, 0, 50, 10, 25, 0]
+            repB: [85,  90,  80,  70,  75,  95,  80,  90,  40,  85,  20],
+            repC: [-10, 20,   5, -15, -30,  40,   0,  50,  10,  25,   0]
         };
 
+        const repMeta = {
+            repA: { label: "Rep. A (Pretend Democrat)",    color: "#3a86ff" },
+            repB: { label: "Rep. B (Pretend Republican)",  color: "#ef233c" },
+            repC: { label: "Rep. C (Pretend Moderate)",    color: "#8338ec" }
+        };
+
+        // ── Chart 1: Bar chart ───────────────────────────────────────
         const ctx = document.getElementById('scoreChart').getContext('2d');
         let currentChart;
 
         function renderChart(data) {
-            if (currentChart) {
-                currentChart.destroy();
-            }
-
+            if (currentChart) currentChart.destroy();
             currentChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: issues,
                     datasets: [{
-                        label: 'Left (-100) / Right (+100) Score',
+                        label: 'Left (−100) / Right (+100) Score',
                         data: data,
-                        backgroundColor: data.map(score => score < 0 ? 'rgba(54, 162, 235, 0.7)' : 'rgba(255, 99, 132, 0.7)'),
-                        borderColor: data.map(score => score < 0 ? 'rgba(54, 162, 235, 1)' : 'rgba(255, 99, 132, 1)'),
+                        backgroundColor: data.map(s => s < 0 ? 'rgba(54,162,235,0.7)' : 'rgba(255,99,132,0.7)'),
+                        borderColor:     data.map(s => s < 0 ? 'rgba(54,162,235,1)'   : 'rgba(255,99,132,1)'),
                         borderWidth: 1
                     }]
                 },
                 options: {
-                    indexAxis: 'y', // Makes it a horizontal bar chart
+                    indexAxis: 'y',
                     responsive: true,
                     scales: {
                         x: {
-                            min: -100,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: 'Ideological Score'
-                            }
+                            min: -100, max: 100,
+                            title: { display: true, text: 'Ideological Score' }
                         }
                     },
                     plugins: {
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
-                                    let val = context.raw;
-                                    let side = val < 0 ? "Left" : (val > 0 ? "Right" : "Center");
+                                label(context) {
+                                    const val = context.raw;
+                                    const side = val < 0 ? "Left" : val > 0 ? "Right" : "Center";
                                     return `Score: ${val} (${side})`;
                                 }
                             }
@@ -129,14 +214,167 @@
             });
         }
 
-        // Initialize chart with the first representative's data
         renderChart(dummyData.repA);
-
-        // Event listener for the dropdown menu
-        document.getElementById('congressSelect').addEventListener('change', function(e) {
-            const selectedRep = e.target.value;
-            renderChart(dummyData[selectedRep]);
+        document.getElementById('congressSelect').addEventListener('change', e => {
+            renderChart(dummyData[e.target.value]);
         });
+
+        // ── Chart 2: Dot / Strip Plot (SVG) ─────────────────────────
+        (function buildDotPlot() {
+            const svg      = document.getElementById('dotPlotSvg');
+            const tooltip  = document.getElementById('dpTooltip');
+
+            // Layout constants
+            const marginLeft   = 195;  // room for issue labels
+            const marginRight  = 20;
+            const marginTop    = 24;
+            const rowHeight    = 42;
+            const dotR         = 7;
+            const axisH        = 36;   // space below last row for axis labels
+
+            const totalW = 860;
+            const totalH = marginTop + issues.length * rowHeight + axisH;
+
+            svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+            svg.setAttribute('height', totalH);
+
+            const plotW = totalW - marginLeft - marginRight;
+
+            // Helper: score → x pixel
+            function scoreToX(score) {
+                return marginLeft + ((score + 100) / 200) * plotW;
+            }
+
+            // ── Background gradient: blue → white → red ──
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%"   stop-color="#cce5ff" stop-opacity="0.45"/>
+                    <stop offset="50%"  stop-color="#f8f8f8" stop-opacity="0.10"/>
+                    <stop offset="100%" stop-color="#ffd6d6" stop-opacity="0.45"/>
+                </linearGradient>`;
+            svg.appendChild(defs);
+
+            // Background rect
+            const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bgRect.setAttribute('x', marginLeft);
+            bgRect.setAttribute('y', marginTop);
+            bgRect.setAttribute('width', plotW);
+            bgRect.setAttribute('height', issues.length * rowHeight);
+            bgRect.setAttribute('fill', 'url(#bgGrad)');
+            svg.appendChild(bgRect);
+
+            // ── Gridlines & axis tick labels ──
+            const tickValues = [-100, -75, -50, -25, 0, 25, 50, 75, 100];
+            tickValues.forEach(val => {
+                const x = scoreToX(val);
+
+                // gridline
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x); line.setAttribute('x2', x);
+                line.setAttribute('y1', marginTop);
+                line.setAttribute('y2', marginTop + issues.length * rowHeight);
+                line.setAttribute('stroke', val === 0 ? '#999' : '#ddd');
+                line.setAttribute('stroke-width', val === 0 ? 1.5 : 1);
+                line.setAttribute('stroke-dasharray', val === 0 ? '4,3' : '');
+                svg.appendChild(line);
+
+                // tick label
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', x);
+                label.setAttribute('y', marginTop + issues.length * rowHeight + 18);
+                label.setAttribute('text-anchor', 'middle');
+                label.setAttribute('font-size', '11');
+                label.setAttribute('fill', '#666');
+                label.textContent = val;
+                svg.appendChild(label);
+            });
+
+            // "← Democrat" / "Republican →" axis endpoint labels
+            const lblD = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            lblD.setAttribute('x', marginLeft);
+            lblD.setAttribute('y', marginTop + issues.length * rowHeight + 34);
+            lblD.setAttribute('text-anchor', 'start');
+            lblD.setAttribute('font-size', '11');
+            lblD.setAttribute('fill', '#3a86ff');
+            lblD.textContent = '← Democrat';
+            svg.appendChild(lblD);
+
+            const lblR = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            lblR.setAttribute('x', marginLeft + plotW);
+            lblR.setAttribute('y', marginTop + issues.length * rowHeight + 34);
+            lblR.setAttribute('text-anchor', 'end');
+            lblR.setAttribute('font-size', '11');
+            lblR.setAttribute('fill', '#ef233c');
+            lblR.textContent = 'Republican →';
+            svg.appendChild(lblR);
+
+            // ── Row backgrounds (alternating) + issue labels ──
+            issues.forEach((issue, i) => {
+                const y = marginTop + i * rowHeight;
+
+                if (i % 2 === 0) {
+                    const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    stripe.setAttribute('x', 0);
+                    stripe.setAttribute('y', y);
+                    stripe.setAttribute('width', totalW);
+                    stripe.setAttribute('height', rowHeight);
+                    stripe.setAttribute('fill', 'rgba(0,0,0,0.025)');
+                    svg.insertBefore(stripe, bgRect); // behind bg gradient
+                }
+
+                const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                lbl.setAttribute('x', marginLeft - 10);
+                lbl.setAttribute('y', y + rowHeight / 2 + 4);
+                lbl.setAttribute('text-anchor', 'end');
+                lbl.setAttribute('font-size', '12');
+                lbl.setAttribute('fill', '#444');
+                lbl.textContent = issue;
+                svg.appendChild(lbl);
+            });
+
+            // ── Dots ──
+            const reps = Object.keys(dummyData);
+
+            reps.forEach(repKey => {
+                const meta = repMeta[repKey];
+                dummyData[repKey].forEach((score, issueIdx) => {
+                    const cx = scoreToX(score);
+                    const cy = marginTop + issueIdx * rowHeight + rowHeight / 2;
+
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', cx);
+                    circle.setAttribute('cy', cy);
+                    circle.setAttribute('r', dotR);
+                    circle.setAttribute('fill', meta.color);
+                    circle.setAttribute('fill-opacity', '0.82');
+                    circle.setAttribute('stroke', '#fff');
+                    circle.setAttribute('stroke-width', '1.5');
+                    circle.style.cursor = 'pointer';
+                    circle.style.transition = 'r 0.12s';
+
+                    // Hover highlight
+                    circle.addEventListener('mouseenter', function(e) {
+                        this.setAttribute('r', dotR + 3);
+                        this.setAttribute('fill-opacity', '1');
+                        const side = score < 0 ? 'Left' : score > 0 ? 'Right' : 'Center';
+                        tooltip.textContent = `${meta.label} — ${issues[issueIdx]}: ${score > 0 ? '+' : ''}${score} (${side})`;
+                        tooltip.style.display = 'block';
+                    });
+                    circle.addEventListener('mousemove', function(e) {
+                        tooltip.style.left = (e.clientX + 14) + 'px';
+                        tooltip.style.top  = (e.clientY - 32) + 'px';
+                    });
+                    circle.addEventListener('mouseleave', function() {
+                        this.setAttribute('r', dotR);
+                        this.setAttribute('fill-opacity', '0.82');
+                        tooltip.style.display = 'none';
+                    });
+
+                    svg.appendChild(circle);
+                });
+            });
+        })();
     </script>
 </body>
 </html>
