@@ -4,271 +4,233 @@ import xml.etree.ElementTree as ET
 import re
 import time
 import os
+from dotenv import load_dotenv
+from requests.exceptions import ChunkedEncodingError, RequestException
+from urllib3.exceptions import ProtocolError
 
 # =========================
 # CONFIG
 # =========================
+load_dotenv()
+API_KEY = os.getenv("CONGRESS_API_KEY")
+CONGRESSES = [118, 119]
+OUTPUT_FILE = "congress_data.csv"
+LAWS_CACHE = "laws_cache.csv"
+VOTES_CACHE = "votes_cache.csv" # New cache for individual member votes
+HEADERS = {"X-API-Key": API_KEY, "User-Agent": "Mozilla/5.0 (PipelineBot/1.0)"}
 
-API_KEY = "pMAZYBmweGSn33zhfhmWnTxzqYeHHoAXqH3RnKY0"
-CONGRESS = 119
-
-CONGRESS_API = "https://api.congress.gov/v3/bill"
-SENATE_BASE = "https://www.senate.gov/legislative/LIS/roll_call_votes"
-
-OUTPUT_FILE = "congress_pipeline.csv"
-
-HEADERS = {
-    "X-API-Key": API_KEY,
-    "User-Agent": "Mozilla/5.0"
+CONGRESS_MAP = {
+    118: {"years": [2023, 2024], "sessions": [1, 2], "active": False},
+    119: {"years": [2025, 2026], "sessions": [1, 2], "active": True}
 }
 
-
 # =========================
-# NORMALIZATION
-# =========================
-
-def normalize_bill_id(bill):
-    if not isinstance(bill, str):
-        return None
-    return re.sub(r"[.\s]", "", bill.lower())
-
-
-# =========================
-# 1. GET LAWS
+# UTILITIES
 # =========================
 
-def get_law_bills(congress):
-    all_bills = []
+def normalize_bill_id(bill_str):
+    if not bill_str: return None
+    return re.sub(r"[.\s]", "", bill_str).lower()
+
+def get_xml_root(url):
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        return ET.fromstring(r.content) if r.status_code == 200 else None
+    except: return None
+
+# =========================
+# 1. LAW FETCHING (WITH CACHE)
+# =========================
+
+def get_public_laws(congress):
+    if os.path.exists(LAWS_CACHE):
+        cache_df = pd.read_csv(LAWS_CACHE)
+        if congress in cache_df['congress'].values and not CONGRESS_MAP[congress]['active']:
+            print(f"Loading Congress {congress} laws from cache...")
+            return set(cache_df[cache_df['congress'] == congress]['bill_id_clean'])
+
+    laws_found = []
     offset = 0
     limit = 250
-
+    print(f"Scanning API for Congress {congress} laws...")
+    
     while True:
-        url = (
-            f"{CONGRESS_API}/{congress}"
-            f"?offset={offset}&limit={limit}&format=json"
-        )
+        url = f"https://api.congress.gov/v3/bill/{congress}?format=json&offset={offset}&limit={limit}"
+        data = None
+        for attempt in range(3):
+            try:
+                r = requests.get(url, headers=HEADERS, timeout=20)
+                r.raise_for_status()
+                data = r.json()
+                break
+            except (ChunkedEncodingError, ProtocolError, RequestException):
+                time.sleep(5)
+        
+        if not data: break
+        for bill in data.get("bills", []):
+            action_text = (bill.get("latestAction") or {}).get("text", "").lower()
+            if "became law" in action_text or "public law" in action_text:
+                laws_found.append({
+                    "congress": congress,
+                    "bill_id_clean": normalize_bill_id(f"{bill.get('type')}{bill.get('number')}"),
+                })
+        
+        total = data.get("pagination", {}).get("count", 0)
+        offset += limit
+        if offset >= total: break
+        time.sleep(0.2)
 
-        r = requests.get(url, headers=HEADERS)
+    new_laws_df = pd.DataFrame(laws_found)
+    if os.path.exists(LAWS_CACHE):
+        old_cache = pd.read_csv(LAWS_CACHE)
+        new_laws_df = pd.concat([old_cache, new_laws_df]).drop_duplicates(subset=['bill_id_clean'])
+    new_laws_df.to_csv(LAWS_CACHE, index=False)
+    return set(new_laws_df[new_laws_df['congress'] == congress]['bill_id_clean'])
 
-        if r.status_code != 200:
-            print("Congress API error:", r.status_code)
-            print(r.text[:300])
-            break
+# =========================
+# 2. VOTE FETCHING (WITH CACHE)
+# =========================
+
+def fetch_senate_votes(congress, session, law_set, existing_vote_ids):
+    votes = []
+    menu_url = f"https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_{congress}_{session}.xml"
+    root = get_xml_root(menu_url)
+    if root == None: return []
+    
+    nums = [v.text for v in root.findall(".//vote_number")]
+    for num in nums:
+        vote_id = f"S-{congress}-{session}-{num}"
+        
+        # SKIP if already in cache
+        if vote_id in existing_vote_ids:
+            continue
+            
+        v_url = f"https://www.senate.gov/legislative/LIS/roll_call_votes/vote{congress}{session}/vote_{congress}_{session}_{num.zfill(5)}.xml"
+        v_root = get_xml_root(v_url)
+        if v_root == None: continue
+        
+        bill_id = normalize_bill_id(v_root.findtext(".//document_name"))
+        if bill_id in law_set:
+            print(f"Adding new Senate Vote: {vote_id} for {bill_id}")
+            for m in v_root.findall(".//member"):
+                votes.append({
+                    "congress": congress, "chamber": "Senate", "vote_id": vote_id,
+                    "bill_id": bill_id, "member": f"{m.findtext('first_name')} {m.findtext('last_name')}",
+                    "vote": m.findtext("vote_cast")
+                })
+        time.sleep(0.1)
+    return votes
+
+def fetch_house_votes(congress, year, law_set, existing_vote_ids):
+    """
+    Incorporates your looping logic (1-999) with pipeline caching 
+    and robust XML parsing for metadata and legislator attributes.
+    """
+    votes = []
+    print(f"--- Scanning House Votes for {year} ---")
+
+    # We loop through possible roll call numbers
+    for i in range(1, 1000):
+        vote_id = f"H-{year}-{i}"
+        
+        # 1. SKIP if already in cache (Saves massive time)
+        if vote_id in existing_vote_ids:
+            continue
+            
+        vote_num_str = str(i).zfill(3)
+        url = f"https://clerk.house.gov/evs/{year}/roll{vote_num_str}.xml"
 
         try:
-            data = r.json()
-        except ValueError:
-            print("Failed to parse JSON")
-            print(r.text[:300])
-            break
-
-        bills = data.get("bills", [])
-
-        # Stop when no more results
-        if not bills:
-            break
-
-        for bill in bills:
-            latest_action_obj = bill.get("latestAction") or {}
-            latest_action_text = latest_action_obj.get("text", "")
-            latest_action = latest_action_text.lower()
-
-            if any(x in latest_action for x in ["became law", "public law"]):
-                bill_type = bill.get("type", "")
-                bill_number = bill.get("number", "")
-                bill_id_clean = f"{bill_type}{bill_number}"
-
-                all_bills.append({
-                    "bill_id_clean": bill_id_clean,
-                    "congress": bill.get("congress"),
-                    "title": bill.get("title"),
-                    "origin_chamber": bill.get("originChamber"),
-                    "latest_action": latest_action_text,
-                    "action_date": latest_action_obj.get("actionDate"),
-                })
-
-        offset += limit
-        time.sleep(0.2)
-
-    return pd.DataFrame(all_bills)
-
-
-# =========================
-# 2. SENATE VOTES 
-# =========================
-
-def get_senate_votes(congress):
-    votes = []
-
-    for session in [1, 2]:
-        print(f"Senate session {session}")
-
-        for i in range(1, 2000):
-            vote_num = str(i).zfill(5)
-
-            url = f"{SENATE_BASE}/vote{congress}{session}/vote_{congress}_{session}_{vote_num}.xml"
-
-            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-
-            if r.status_code == 404:
-                continue
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
             if r.status_code != 200:
+                # If we hit a 404, we've likely reached the end of the votes for that year
                 break
 
-            xml_text = r.text
+            root = ET.fromstring(r.content)
+            
+            # 2. Extract Metadata using the paths from your snippet
+            metadata = root.find(".//vote-metadata")
+            if metadata is None: continue
+            
+            legis_num = metadata.findtext("legis-num")
+            
+            # Normalize for matching
+            bill_clean = normalize_bill_id(legis_num)
 
-            # Fix common XML issues
-            xml_text = xml_text.replace("&", "&amp;")
+            # 3. ONLY process if it's in our Law Set
+            if bill_clean and bill_clean in law_set:
+                print(f"Adding new House Vote: {vote_id} for {bill_clean}")
+                
+                vote_desc = metadata.findtext("vote-desc")
+                vote_question = metadata.findtext("vote-question")
 
-            try:
-                root = ET.fromstring(xml_text)
-            except ET.ParseError:
-                print("Bad XML at:", url)
-                print(xml_text[:500])
-                continue
+                for v in root.findall(".//recorded-vote"):
+                    leg = v.find("legislator")
+                    choice = v.find("vote")
 
-            bill = root.findtext(".//document_name") or ""
-            bill_clean = normalize_bill_id(bill)
-
-            vote_number = root.findtext(".//vote_number")
-
-            for m in root.findall(".//member"):
-                first = m.findtext("first_name") or ""
-                last = m.findtext("last_name") or ""
-                full_name = f"{first} {last}".strip()
-
-                votes.append({
-                    "bill_id_clean": bill_clean,
-                    "vote_number": vote_number,
-                    "member_id": m.findtext("lis_member_id"),
-                    "name": full_name,
-                    "party": m.findtext("party"),
-                    "state": m.findtext("state"),
-                    "vote": m.findtext("vote_cast"),
-                    "chamber": "senate"
-                })
-
+                    if leg is not None:
+                        votes.append({
+                            "congress": congress,
+                            "chamber": "House",
+                            "vote_id": vote_id,
+                            "bill_id": bill_clean,
+                            "member": leg.text or "Unknown",
+                            "bioguide_id": leg.attrib.get("name-id"),
+                            "party": leg.attrib.get("party"),
+                            "state": leg.attrib.get("state"),
+                            "vote": choice.text if choice is not None else "Unknown",
+                            "description": vote_desc,
+                            "question": vote_question
+                        })
+            
+            # Be kind to the Clerk's server
             time.sleep(0.1)
 
-    return pd.DataFrame(votes)
-
-
-# =========================
-# 3. HOUSE VOTES
-# =========================
-
-def get_house_votes():
-    all_votes = []
-
-    for i in range(1, 1000):
-        vote_num = str(i).zfill(3)
-        url = f"https://clerk.house.gov/evs/2025/roll{vote_num}.xml"
-
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-
-        if r.status_code != 200:
-            break
-
-        root = ET.fromstring(r.content)
-
-        metadata = root.find(".//vote-metadata")
-        if metadata is None:
+        except Exception as e:
+            print(f"Error on House Vote {i}: {e}")
             continue
 
-        legis_num = metadata.findtext("legis-num")
-        bill_clean = normalize_bill_id(legis_num)
-
-        vote_desc = metadata.findtext("vote-desc")
-        vote_question = metadata.findtext("vote-question")
-
-        for v in root.findall(".//recorded-vote"):
-            leg = v.find("legislator")
-            choice = v.find("vote")
-
-            all_votes.append({
-                "roll_call": i,
-                "bill_id_clean": bill_clean,
-                "bill_raw": legis_num,
-                "member_id": leg.attrib.get("name-id") if leg is not None else None,
-                "name": leg.text if leg is not None else None,
-                "party": leg.attrib.get("party") if leg is not None else None,
-                "state": leg.attrib.get("state") if leg is not None else None,
-                "vote": choice.text if choice is not None else None,
-                "description": vote_desc,
-                "question": vote_question,
-                "chamber": "house"
-            })
-
-        time.sleep(0.2)
-
-    return pd.DataFrame(all_votes)
-
+    return votes
 
 # =========================
-# 4. LOAD EXISTING DATA
-# =========================
-
-def load_existing():
-    if os.path.exists(OUTPUT_FILE):
-        return pd.read_csv(OUTPUT_FILE)
-    return pd.DataFrame()
-
-
-# =========================
-# 5. PIPELINE
+# MAIN PIPELINE
 # =========================
 
 def run_pipeline():
-    print("Loading existing dataset...")
-    old_data = load_existing()
+    existing_vote_ids = set()
+    if os.path.exists(VOTES_CACHE):
+        existing_df = pd.read_csv(VOTES_CACHE)
+        existing_vote_ids = set(existing_df['vote_id'].unique())
+        print(f"Cache loaded: {len(existing_vote_ids)} votes already stored.")
 
-    print("Fetching law bills...")
-    laws = get_law_bills(CONGRESS)
+    all_new_votes = []
+    
+    for congress in CONGRESSES:
+        law_set = get_public_laws(congress)
+        
+        # Senate
+        for sess in CONGRESS_MAP[congress]["sessions"]:
+            all_new_votes.extend(fetch_senate_votes(congress, sess, law_set, existing_vote_ids))
+        
+        # House
+        for yr in CONGRESS_MAP[congress]["years"]:
+            all_new_votes.extend(fetch_house_votes(congress, yr, law_set, existing_vote_ids))
 
-    law_set = set(laws["bill_id_clean"]) if not laws.empty else set()
-
-    print("Fetching Senate votes...")
-    senate = get_senate_votes(CONGRESS)
-
-    print("Fetching House votes...")
-    house = get_house_votes()
-
-    # =========================
-    # FILTER AFTER NORMALIZATION (IMPORTANT FIX)
-    # =========================
-
-    if not senate.empty:
-        senate = senate[senate["bill_id_clean"].isin(law_set)]
-
-    if not house.empty:
-        house = house[house["bill_id_clean"].isin(law_set)]
-
-    # =========================
-    # MERGE ALL
-    # =========================
-
-    new_data = pd.concat([senate, house], ignore_index=True)
-
-    # enrich with law metadata
-    if not laws.empty:
-        new_data = new_data.merge(laws, on="bill_id_clean", how="left")
-
-    # =========================
-    # DEDUPE
-    # =========================
-
-    combined = pd.concat([old_data, new_data], ignore_index=True)
-
-    combined = combined.drop_duplicates(
-        subset=["bill_id_clean", "member_id", "vote_number"],
-        keep="last"
-    )
-
-    print(f"Saving {len(combined)} rows...")
-    combined.to_csv(OUTPUT_FILE, index=False)
-
-    print("Done.")
-
+    # 2. Update the Votes Cache
+    if all_new_votes:
+        new_votes_df = pd.DataFrame(all_new_votes)
+        if os.path.exists(VOTES_CACHE):
+            final_votes_df = pd.concat([pd.read_csv(VOTES_CACHE), new_votes_df])
+        else:
+            final_votes_df = new_votes_df
+            
+        final_votes_df.drop_duplicates(subset=["vote_id", "member"], inplace=True)
+        final_votes_df.to_csv(VOTES_CACHE, index=False)
+        # Final output for your site
+        final_votes_df.to_csv(OUTPUT_FILE, index=False)
+        print(f"Pipeline complete. Total records: {len(final_votes_df)}")
+    else:
+        print("No new votes found to add.")
 
 if __name__ == "__main__":
     run_pipeline()
