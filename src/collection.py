@@ -122,10 +122,7 @@ def fetch_senate_votes(congress, session, law_set, existing_vote_ids):
     return votes
 
 def fetch_house_votes(congress, year, law_set, existing_vote_ids):
-    """
-    Incorporates your looping logic (1-999) with pipeline caching 
-    and robust XML parsing for metadata and legislator attributes.
-    """
+   
     votes = []
     print(f"--- Scanning House Votes for {year} ---")
 
@@ -143,7 +140,6 @@ def fetch_house_votes(congress, year, law_set, existing_vote_ids):
         try:
             r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
             if r.status_code != 200:
-                # If we hit a 404, we've likely reached the end of the votes for that year
                 break
 
             root = ET.fromstring(r.content)
@@ -182,8 +178,6 @@ def fetch_house_votes(congress, year, law_set, existing_vote_ids):
                             "description": vote_desc,
                             "question": vote_question
                         })
-            
-            # Be kind to the Clerk's server
             time.sleep(0.1)
 
         except Exception as e:
