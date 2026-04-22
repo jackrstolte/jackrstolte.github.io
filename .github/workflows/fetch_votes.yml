@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests
+          pip install pandas requests dotenv
 
       - name: Run script
         run: python collection.py
