@@ -115,7 +115,8 @@ def fetch_senate_votes(congress, session, law_set, existing_vote_ids):
             for m in v_root.findall(".//member"):
                 votes.append({
                     "congress": congress, "chamber": "Senate", "vote_id": vote_id,
-                    "bill_id": bill_id, "member": f"{m.findtext('first_name')} {m.findtext('last_name')}",
+                    "bill_id": bill_id, "member": f"{m.findtext('first_name')} {m.findtext('last_name')}", "party": m.findtext("party"),      # ✅ added
+                    "state": m.findtext("state"), 
                     "vote": m.findtext("vote_cast")
                 })
         time.sleep(0.1)
