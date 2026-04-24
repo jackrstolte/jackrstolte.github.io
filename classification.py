@@ -35,3 +35,7 @@ def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
         return "Public Law text not found"
     except Exception as e:
         return f"Error: {str(e)}"
+    
+def sep_billID(df_bills): 
+  df_bills[['billType', 'billNumber']] = df_bills['billID'].str.extract(r'([A-Za-z]+)(\d+)')
+
