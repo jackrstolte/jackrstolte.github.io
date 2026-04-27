@@ -63,9 +63,13 @@ def _majority_vote(series: pd.Series) -> str | None:
     return None   # tie
 
 
-def _is_partisan(group: pd.DataFrame) -> bool:
+def _classify_group(group: pd.DataFrame) -> tuple:
     """
-    Decide whether a single (bill_id, chamber) vote group is partisan.
+    Classify a single (bill_id, chamber) vote group.
+
+    Returns
+    -------
+    (is_partisan, generic_d_vote, generic_r_vote)
 
     Rules
     -----
@@ -74,8 +78,8 @@ def _is_partisan(group: pd.DataFrame) -> bool:
     - Only "Yea" and "Nay" votes count; "Not Voting", "Present", etc. are
       excluded.
     - If either party has a tied majority (or no eligible voters), the group
-      is treated as nonpartisan.
-    - Partisan = Democrat majority ≠ Republican majority.
+      is treated as nonpartisan (is_partisan=False).
+    - Partisan = Democrat majority != Republican majority.
     """
     eligible = group[group["vote"].isin(["Yea", "Nay"])]
 
@@ -85,11 +89,12 @@ def _is_partisan(group: pd.DataFrame) -> bool:
     dem_majority = _majority_vote(dem_votes)
     rep_majority = _majority_vote(rep_votes)
 
-    # Either party tied (or no data) → nonpartisan
+    # Either party tied (or no data) -> nonpartisan
     if dem_majority is None or rep_majority is None:
-        return False
+        return False, None, None
 
-    return dem_majority != rep_majority
+    is_partisan = dem_majority != rep_majority
+    return is_partisan, dem_majority, rep_majority
 
 
 # ── Main function ─────────────────────────────────────────────────────────────
@@ -134,7 +139,11 @@ def process_votes() -> None:
     nonpartisan_rows = []
 
     for (bill_id, chamber), group in df_latest.groupby(["bill_id", "chamber"]):
-        if _is_partisan(group):
+        is_partisan, d_vote, r_vote = _classify_group(group)
+        if is_partisan:
+            group = group.copy()
+            group["generic_d_vote"] = d_vote
+            group["generic_r_vote"] = r_vote
             partisan_rows.append(group)
         else:
             nonpartisan_rows.append(group)
