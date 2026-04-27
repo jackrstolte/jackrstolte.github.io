@@ -5,6 +5,10 @@ import pandas as pd
 import warnings
 import torch
 from transformers import pipeline 
+import os
+
+CONGRESS_API_KEY = os.getenv("CONGRESS_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
     '''Fetches the text of a public law given its congress, bill type, and bill number.
@@ -42,7 +46,7 @@ def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
         return f"Error: {str(e)}"
     
 def sep_billID(df_bills): 
-  df_bills[['billType', 'billNumber']] = df_bills['billID'].str.extract(r'([A-Za-z]+)(\d+)')
+  df_bills[['billType', 'billNumber']] = df_bills['bill_id_clean'].str.extract(r'([A-Za-z]+)(\d+)')
 
 def classify_bills(df_bills):
     categories = [
@@ -57,3 +61,13 @@ def classify_bills(df_bills):
     results = classifier(df_bills['full_text'].tolist(), candidate_labels=categories, batch_size=len(df_bills))
     df_bills['predicted_category'] = [res['labels'][0] for res in results]
     df_bills['confidence_score'] = [res['scores'][0] for res in results]
+
+def pipe():
+    df_bills = pd.read_csv("laws_cache.csv")
+    sep_billID(df_bills)
+    df_bills['full_text'] = df_bills.apply(lambda row: fetch_public_law_text(row['congress'], row['billType'], row['billNumber'], CONGRESS_API_KEY, "https://api.congress.gov/v3"), axis=1)
+    classify_bills(df_bills)
+    df_bills.to_csv("classified_bills.csv", index=False)
+
+if __name__ == "__main__":
+    pipe()
