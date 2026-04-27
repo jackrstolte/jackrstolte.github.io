@@ -13,13 +13,18 @@ from urllib3.exceptions import ProtocolError
 # =========================
 load_dotenv()
 API_KEY = os.getenv("CONGRESS_API_KEY")
-CONGRESSES = [118, 119]
+CONGRESSES = [116, 117, 118, 119]
 OUTPUT_FILE = "data/congress_data.csv"
 LAWS_CACHE = "laws_cache.csv"
-VOTES_CACHE = "votes_cache.csv" # New cache for individual member votes
+VOTES_CACHE = "votes_cache.csv" 
 HEADERS = {"X-API-Key": API_KEY, "User-Agent": "Mozilla/5.0 (PipelineBot/1.0)"}
 
+if not API_KEY:
+    raise ValueError("Missing CONGRESS_API_KEY")
+
 CONGRESS_MAP = {
+    116: {"years": [2019, 2020], "sessions": [1, 2], "active": False},
+    117: {"years": [2021, 2022], "sessions": [1, 2], "active": False},
     118: {"years": [2023, 2024], "sessions": [1, 2], "active": False},
     119: {"years": [2025, 2026], "sessions": [1, 2], "active": True}
 }
