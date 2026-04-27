@@ -1,9 +1,14 @@
 import requests
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+warnings.filterwarnings('ignore', category=XMLParsedAsHTMLWarning)
 import pandas as pd
 import warnings
+import torch
+from transformers import pipeline 
 
 def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
+    '''Fetches the text of a public law given its congress, bill type, and bill number.
+    Set base URLS BASE_URL = "https://api.congress.gov/v3" and API_KEY'''
     billType_lower = billType.lower()
     endpoint = f"{base_url}/bill/{congress}/{billType_lower}/{billNumber}/text"
     params = {"api_key": api_key, "format": "json"}
@@ -39,3 +44,16 @@ def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
 def sep_billID(df_bills): 
   df_bills[['billType', 'billNumber']] = df_bills['billID'].str.extract(r'([A-Za-z]+)(\d+)')
 
+def classify_bills(df_bills):
+    categories = [
+    "Immigration", "Healthcare", "Taxes/spending/budget", "Education",
+    "Climate/environment", "Nominations", "Entitlements (welfare)",
+    "Military/national security", "Technology", "Business/employment", "Miscellaneous"]
+    device = 0 if torch.cuda.is_available() else -1
+
+    classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device=device
+    )
+
+    results = classifier(df_bills['full_text'].tolist(), candidate_labels=categories, batch_size=len(df_bills))
+    df_bills['predicted_category'] = [res['labels'][0] for res in results]
+    df_bills['confidence_score'] = [res['scores'][0] for res in results]
