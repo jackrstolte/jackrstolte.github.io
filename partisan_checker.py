@@ -113,14 +113,16 @@ def process_votes() -> None:
     # Strip any accidental BOM from the first column header
     df.columns = [c.lstrip("\ufeff").strip() for c in df.columns]
 
-    # ── 2. Keep only the most recent vote per (bill_id, chamber) ─────────────
+    # ── 2. Keep only the most recent vote per (bill_id, chamber, congress) ──────
     #
-    # Add a numeric sort key so we can pick the max vote_id per group.
+    # Grouping by congress ensures that e.g. HR 1 from the 117th and HR 1 from
+    # the 118th are treated as distinct bills and each get their own most-recent
+    # vote retained.
     df["_vote_num"] = df["vote_id"].apply(_vote_id_sort_key)
 
-    # For each (bill_id, chamber), find the maximum numeric vote_id.
+    # For each (bill_id, chamber, congress), find the maximum numeric vote_id.
     latest = (
-        df.groupby(["bill_id", "chamber"])["_vote_num"]
+        df.groupby(["bill_id", "chamber", "congress"])["_vote_num"]
         .transform("max")
     )
 
@@ -138,7 +140,7 @@ def process_votes() -> None:
     partisan_rows    = []
     nonpartisan_rows = []
 
-    for (bill_id, chamber), group in df_latest.groupby(["bill_id", "chamber"]):
+    for (bill_id, chamber, congress), group in df_latest.groupby(["bill_id", "chamber", "congress"]):
         is_partisan, d_vote, r_vote = _classify_group(group)
         if is_partisan:
             group = group.copy()
