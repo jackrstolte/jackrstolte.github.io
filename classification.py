@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+import warnings
 warnings.filterwarnings('ignore', category=XMLParsedAsHTMLWarning)
 import pandas as pd
-import warnings
 import torch
 from transformers import pipeline 
 import os
@@ -67,6 +67,7 @@ def pipe():
     sep_billID(df_bills)
     df_bills['full_text'] = df_bills.apply(lambda row: fetch_public_law_text(row['congress'], row['billType'], row['billNumber'], CONGRESS_API_KEY, "https://api.congress.gov/v3"), axis=1)
     classify_bills(df_bills)
+    df_bills=df_bills[['congress', 'bill_id_clean', 'predicted_category']]
     df_bills.to_csv("classified_bills.csv", index=False)
 
 if __name__ == "__main__":
