@@ -14,7 +14,7 @@ from urllib3.exceptions import ProtocolError
 load_dotenv()
 API_KEY = os.getenv("CONGRESS_API_KEY")
 CONGRESSES = [118, 119]
-OUTPUT_FILE = "congress_data.csv"
+OUTPUT_FILE = "data/congress_data.csv"
 LAWS_CACHE = "laws_cache.csv"
 VOTES_CACHE = "votes_cache.csv" # New cache for individual member votes
 HEADERS = {"X-API-Key": API_KEY, "User-Agent": "Mozilla/5.0 (PipelineBot/1.0)"}
