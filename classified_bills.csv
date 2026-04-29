@@ -1,0 +1,357 @@
+congress,bill_id_clean,predicted_category
+118,hjres7,Climate/environment
+118,hr82,Entitlements (welfare)
+118,hr346,Entitlements (welfare)
+118,hr423,Entitlements (welfare)
+118,hr366,Healthcare
+118,hr292,Technology
+118,s30,Technology
+118,s111,Miscellaneous
+118,s112,Entitlements (welfare)
+118,s91,Entitlements (welfare)
+118,s50,Technology
+118,s59,Nominations
+118,hr593,Healthcare
+118,s138,Entitlements (welfare)
+118,s133,Entitlements (welfare)
+118,s134,Business/employment
+118,hr599,Business/employment
+118,hr663,Nominations
+118,s141,Nominations
+118,hr670,Entitlements (welfare)
+118,hjres26,Nominations
+118,s206,Business/employment
+118,hr815,Miscellaneous
+118,s227,Technology
+118,s265,Business/employment
+118,hr807,Nominations
+118,s223,Technology
+118,s382,Entitlements (welfare)
+118,s310,Entitlements (welfare)
+118,hr996,Technology
+118,hr1042,Entitlements (welfare)
+118,s467,Business/employment
+118,hr1096,Entitlements (welfare)
+118,s475,Entitlements (welfare)
+118,s474,Entitlements (welfare)
+118,hr1105,Technology
+118,hr1076,Business/employment
+118,hr1098,Miscellaneous
+118,hr1060,Technology
+118,hr1097,Entitlements (welfare)
+118,s619,Entitlements (welfare)
+118,hr1226,Entitlements (welfare)
+118,s546,Nominations
+118,hr1240,Business/employment
+118,s612,Technology
+118,s656,Business/employment
+118,s679,Miscellaneous
+118,s670,Entitlements (welfare)
+118,hr1432,Military/national security
+118,hr1318,Technology
+118,hr1568,Technology
+118,hr1505,Business/employment
+118,s709,Entitlements (welfare)
+118,s759,Entitlements (welfare)
+118,hr1555,Technology
+118,s777,Entitlements (welfare)
+118,s788,Entitlements (welfare)
+118,s870,Entitlements (welfare)
+118,s794,Entitlements (welfare)
+118,hr1607,Entitlements (welfare)
+118,hr1734,Entitlements (welfare)
+118,hr1722,Technology
+118,s932,Business/employment
+118,hr1727,Technology
+118,s992,Business/employment
+118,hr2365,Miscellaneous
+118,hr1823,Nominations
+118,hr2379,Technology
+118,s1147,Entitlements (welfare)
+118,hr2468,Nominations
+118,hr2544,Entitlements (welfare)
+118,hr2670,Entitlements (welfare)
+118,hr2839,Entitlements (welfare)
+118,s1278,Technology
+118,hr2754,Technology
+118,hr2872,Entitlements (welfare)
+118,hr2882,Nominations
+118,hr2950,Entitlements (welfare)
+118,s1351,Entitlements (welfare)
+118,hr3019,Nominations
+118,hr2997,Business/employment
+118,s1549,Technology
+118,s1510,Entitlements (welfare)
+118,s1478,Technology
+118,hr3315,Military/national security
+118,hjres62,Technology
+118,hjres63,Climate/environment
+118,hjres64,Technology
+118,s1608,Business/employment
+118,hr3254,Entitlements (welfare)
+118,hr3324,Climate/environment
+118,hr3354,Business/employment
+118,s1648,Nominations
+118,hr3391,Nominations
+118,hr3672,Technology
+118,hr3608,Technology
+118,hr3746,Nominations
+118,hr3728,Technology
+118,hr3821,Technology
+118,hr3801,Nominations
+118,hr3797,Entitlements (welfare)
+118,s1858,Business/employment
+118,hr3865,Technology
+118,hr4004,Entitlements (welfare)
+118,hr3947,Technology
+118,hr3944,Technology
+118,hr3935,Entitlements (welfare)
+118,s1973,Entitlements (welfare)
+118,s2051,Nominations
+118,hr4190,Technology
+118,hr4094,Technology
+118,hr4136,Healthcare
+118,s2143,Technology
+118,s2181,Technology
+118,hr4366,Entitlements (welfare)
+118,hr4389,Technology
+118,hr4385,Technology
+118,hr4467,Entitlements (welfare)
+118,hr4581,Technology
+118,s2228,Entitlements (welfare)
+118,s2274,Technology
+118,s2414,Business/employment
+118,s2513,Entitlements (welfare)
+118,s2685,Entitlements (welfare)
+118,hr5009,Entitlements (welfare)
+118,hr4955,Entitlements (welfare)
+118,hr5103,Nominations
+118,hr4984,Entitlements (welfare)
+118,hr5110,Education
+118,hr5302,Business/employment
+118,hr5301,Entitlements (welfare)
+118,s2795,Healthcare
+118,s2747,Technology
+118,s2787,Technology
+118,s2781,Entitlements (welfare)
+118,hr5443,Entitlements (welfare)
+118,s2825,Entitlements (welfare)
+118,s2861,Entitlements (welfare)
+118,hr5464,Healthcare
+118,hr5476,Technology
+118,hr5490,Nominations
+118,hr5536,Nominations
+118,hr5640,Nominations
+118,hr5712,Technology
+118,hr5646,Entitlements (welfare)
+118,hr5860,Nominations
+118,hr5861,Business/employment
+118,hr5799,Technology
+118,hr5863,Entitlements (welfare)
+118,hr5770,Nominations
+118,hr5867,Nominations
+118,hr5887,Healthcare
+118,hr5985,Healthcare
+118,s3126,Healthcare
+118,hr6073,Healthcare
+118,hr6062,Healthcare
+118,s3222,Healthcare
+118,hr6116,Technology
+118,hr6162,Healthcare
+118,hr6188,Healthcare
+118,hr6363,Healthcare
+118,s3250,Healthcare
+118,s3249,Healthcare
+118,s3285,Healthcare
+118,hr6249,Healthcare
+118,s3267,Healthcare
+118,hr6324,Healthcare
+118,hr6244,Healthcare
+118,hr6503,Healthcare
+118,hr6395,Healthcare
+118,hr6492,Healthcare
+118,s3427,Healthcare
+118,hr6513,Healthcare
+118,s3419,Healthcare
+118,hr6651,Healthcare
+118,s3448,Technology
+118,hr6633,Technology
+118,s3475,Healthcare
+118,hr6750,Healthcare
+118,hr6826,Healthcare
+118,hr6829,Healthcare
+118,hr6843,Healthcare
+118,hr6810,Technology
+118,hr6852,Healthcare
+118,hr7032,Healthcare
+118,s3640,Healthcare
+118,s3639,Technology
+118,s3613,Healthcare
+118,hr6960,Healthcare
+118,hr6983,Healthcare
+118,s3706,Healthcare
+118,hr7189,Healthcare
+118,hr7192,Healthcare
+118,hr7199,Healthcare
+118,hr7177,Healthcare
+118,hr7213,Healthcare
+118,hr7180,Healthcare
+118,hr7158,Healthcare
+118,s3764,Healthcare
+118,hr7333,Healthcare
+118,hr7218,Healthcare
+118,s3791,Healthcare
+118,hr7463,Healthcare
+118,hr7454,Healthcare
+118,hr7377,Healthcare
+118,hr7423,Healthcare
+118,hr7438,Healthcare
+118,hr7332,Healthcare
+118,hr7365,Healthcare
+118,hr7385,Healthcare
+118,hr7417,Healthcare
+118,hr7508,Healthcare
+118,hr7507,Healthcare
+118,s3851,Healthcare
+118,s3857,Healthcare
+118,hr7524,Healthcare
+118,hr7606,Healthcare
+118,hr7607,Healthcare
+118,hr7764,Healthcare
+118,s3960,Healthcare
+118,s3959,Miscellaneous
+118,s3946,Technology
+118,s3938,Technology
+118,hr7777,Healthcare
+118,s3998,Technology
+118,hr7888,Healthcare
+118,hr7872,Healthcare
+118,s4077,Healthcare
+118,s4107,Healthcare
+118,hr7893,Healthcare
+118,hr7938,Healthcare
+118,hr8012,Healthcare
+118,hr8057,Healthcare
+118,s4243,Healthcare
+118,hr8219,Healthcare
+118,hr8289,Healthcare
+118,s4351,Healthcare
+118,hr8413,Healthcare
+118,s4367,Healthcare
+118,s4548,Healthcare
+118,hr8663,Healthcare
+118,hr8641,Healthcare
+118,hr8667,Healthcare
+118,hr8666,Healthcare
+118,hr8717,Healthcare
+118,s4610,Healthcare
+118,hr8841,Healthcare
+118,hr8868,Healthcare
+118,hr8932,Healthcare
+118,hr8909,Technology
+118,hr8919,Technology
+118,hr8976,Technology
+118,s4698,Healthcare
+118,hr9106,Healthcare
+118,s4716,Healthcare
+118,hr9076,Healthcare
+118,hr9124,Healthcare
+118,hr9285,Healthcare
+118,hr9468,Healthcare
+118,hr9322,Technology
+118,hr9421,Technology
+118,hr9487,Healthcare
+118,hr9566,Healthcare
+118,hr9544,Technology
+118,hr9580,Healthcare
+118,hr9549,Healthcare
+118,hr9600,Healthcare
+118,hr9592,Healthcare
+118,hr9747,Healthcare
+118,hr9775,Healthcare
+118,s5314,Healthcare
+118,hr10065,Healthcare
+118,s5355,Healthcare
+118,hr10545,Healthcare
+119,s5,Healthcare
+119,hr43,Healthcare
+119,hr42,Healthcare
+119,hr165,Healthcare
+119,hr187,Healthcare
+119,hr224,Healthcare
+119,hr1,Healthcare
+119,hjres20,Technology
+119,hjres24,Technology
+119,hr517,Healthcare
+119,hr452,Healthcare
+119,hr410,Technology
+119,hjres25,Technology
+119,s146,Healthcare
+119,s160,Technology
+119,hr618,Healthcare
+119,hr695,Healthcare
+119,s201,Healthcare
+119,s260,Healthcare
+119,s216,Healthcare
+119,s284,Healthcare
+119,s222,Healthcare
+119,s331,Healthcare
+119,s356,Healthcare
+119,s269,Healthcare
+119,hjres35,Healthcare
+119,sjres11,Technology
+119,sjres13,Healthcare
+119,hr998,Healthcare
+119,hr970,Healthcare
+119,hr983,Healthcare
+119,s423,Healthcare
+119,hjres42,Healthcare
+119,hr1316,Healthcare
+119,sjres18,Healthcare
+119,hjres60,Technology
+119,s616,Healthcare
+119,hr1491,Healthcare
+119,hjres61,Technology
+119,hr1512,Technology
+119,sjres28,Technology
+119,hr1815,Healthcare
+119,hr1912,Healthcare
+119,hr1968,Healthcare
+119,hjres75,Healthcare
+119,sjres31,Healthcare
+119,hr2170,Healthcare
+119,s1071,Entitlements (welfare)
+119,hr2215,Technology
+119,hr2316,Healthcare
+119,hjres89,Healthcare
+119,hjres88,Healthcare
+119,hjres87,Technology
+119,hr2483,Healthcare
+119,hr2808,Healthcare
+119,s1582,Healthcare
+119,s1596,Healthcare
+119,s1884,Healthcare
+119,hr4,Healthcare
+119,hjres104,Technology
+119,hjres105,Healthcare
+119,hjres106,Technology
+119,hr4323,Healthcare
+119,hr4405,Healthcare
+119,s2283,Healthcare
+119,hr4446,Healthcare
+119,s2392,Healthcare
+119,hr5371,Healthcare
+119,sjres80,Healthcare
+119,s2878,Healthcare
+119,hjres130,Entitlements (welfare)
+119,hjres131,Technology
+119,hjres133,Healthcare
+119,s3424,Healthcare
+119,hr6938,Healthcare
+119,hr7148,Entitlements (welfare)
+119,hjres142,Healthcare
+119,s3705,Healthcare
+119,hr7211,Technology
+119,s3971,Healthcare
+119,s4138,Healthcare
+119,hr8322,Healthcare
