@@ -11,39 +11,90 @@ CONGRESS_API_KEY = os.getenv("CONGRESS_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 def fetch_public_law_text(congress, billType, billNumber, api_key, base_url):
-    '''Fetches the text of a public law given its congress, bill type, and bill number.
-    Set base URLS BASE_URL = "https://api.congress.gov/v3" and API_KEY'''
+    """
+    Fetches public law text via two strategies:
+    1. Primary: govinfo.gov API using PLAW package (avoids congress.gov 403s)
+    2. Fallback: congress.gov API text endpoint
+    
+    api_key: your api.data.gov key (works for both congress.gov and govinfo.gov)
+    """
     billType_lower = billType.lower()
-    endpoint = f"{base_url}/bill/{congress}/{billType_lower}/{billNumber}/text"
-    params = {"api_key": api_key, "format": "json"}
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
 
     try:
-        response = requests.get(endpoint, params=params)
+        endpoint = f"{base_url}/bill/{congress}/{billType_lower}/{billNumber}"
+        response = requests.get(endpoint, params={"api_key": api_key, "format": "json"})
+        response.raise_for_status()
+        data = response.json()
+
+        # Extract public law number e.g. "118-3" -> publ3
+        laws = data.get('bill', {}).get('laws', [])
+        public_law = next((l for l in laws if l.get('type') == 'Public Law'), None)
+
+        if public_law:
+            law_number = public_law.get('number', '')  # e.g. "118-273"
+            law_num_only = law_number.split('-')[-1]    # e.g. "273"
+            package_id = f"PLAW-{congress}publ{law_num_only}"
+
+            # Fetch HTM text directly from govinfo
+            htm_url = f"https://api.govinfo.gov/packages/{package_id}/htm"
+            gov_response = requests.get(
+                htm_url,
+                params={"api_key": api_key},
+                headers=headers
+            )
+
+            if gov_response.status_code == 200:
+                soup = BeautifulSoup(gov_response.content, 'html.parser')
+                return soup.get_text(separator=' ', strip=True)
+
+    except Exception as e:
+        print(f"govinfo strategy failed for {billType}{billNumber}: {str(e)}")
+    try:
+        endpoint = f"{base_url}/bill/{congress}/{billType_lower}/{billNumber}/text"
+        response = requests.get(endpoint, params={"api_key": api_key, "format": "json"})
         response.raise_for_status()
         data = response.json()
 
         text_versions = data.get('textVersions', [])
-        for version in text_versions:
-            if version.get('type') == 'Public Law':
-                formats = version.get('formats', [])
-                # Look for XML first
-                xml_format = next((f for f in formats if 'xml' in f.get('type', '').lower()), None)
-                target_format = xml_format if xml_format else (formats[-1] if formats else None)
+        version_priority = ['public law', 'enrolled bill']
+        selected_version = None
 
-                if target_format and 'url' in target_format:
-                    text_url = target_format['url']
-                    content_url = f"{text_url}?api_key={api_key}" if '?' not in text_url else f"{text_url}&api_key={api_key}"
-                    text_response = requests.get(content_url)
-                    text_response.raise_for_status()
+        for priority in version_priority:
+            selected_version = next(
+                (v for v in text_versions if v.get('type', '').lower() == priority), None
+            )
+            if selected_version:
+                break
 
-                    # Use lxml for better XML parsing if xml_format exists
-                    parser = 'lxml' if xml_format else 'html.parser'
-                    soup = BeautifulSoup(text_response.content, parser)
-                    return soup.get_text(separator=' ', strip=True)
+        if not selected_version and text_versions:
+            selected_version = text_versions[0]
+
+        if selected_version:
+            formats = selected_version.get('formats', [])
+            # Try Formatted Text first, skip uslm xml
+            target = next((f for f in formats if f.get('type') == 'Formatted Text'), None)
+            if not target:
+                target = next((f for f in formats 
+                               if 'xml' in f.get('type','').lower() 
+                               and 'uslm' not in f.get('url','').lower()), None)
+            if not target and formats:
+                target = formats[0]
+
+            if target and 'url' in target:
+                text_response = requests.get(target['url'], headers=headers)
+                text_response.raise_for_status()
+                soup = BeautifulSoup(text_response.content, 'html.parser')
+                return soup.get_text(separator=' ', strip=True)
 
         return "Public Law text not found"
     except Exception as e:
         return f"Error: {str(e)}"
+
     
 def sep_billID(df_bills): 
   df_bills[['billType', 'billNumber']] = df_bills['bill_id_clean'].str.extract(r'([A-Za-z]+)(\d+)')
