@@ -1,4 +1,4 @@
-name: Fetch Votes Weekly
+name: Weekly Pipeline
 
 on:
   schedule:
@@ -10,9 +10,10 @@ permissions:
 
 env:
   CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
 jobs:
-  run-script:
+  run-pipeline:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,15 +27,22 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests dotenv
+          pip install \
+            pandas \
+            requests \
+            python-dotenv \
+            beautifulsoup4 \
+            lxml \
+            transformers \
+            torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Run script
-        run: python collection.py
+      - name: Run pipeline
+        run: python main.py
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add .
-          git commit -m "Update vote data" || echo "No changes"
+          git add data/ laws_cache.csv votes_cache.csv classified_bills.csv
+          git commit -m "Weekly pipeline update $(date -u '+%Y-%m-%d')" || echo "No changes"
           git push
