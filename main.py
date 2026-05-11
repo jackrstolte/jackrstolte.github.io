@@ -29,13 +29,11 @@ def _run_step(name: str, fn):
 
 def main():
     from collection import run_pipeline
-    from classification import pipe as classify_bills
     from partisan_checker import process_votes
     from score_calculator import calculate_scores
 
     steps = [
         ("collection",       run_pipeline),
-        ("classification",   classify_bills),
         ("partisan_checker", process_votes),
         ("score_calculator", calculate_scores),
     ]
