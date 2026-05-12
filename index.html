@@ -412,10 +412,11 @@
 
             const marginLeft  = 195;
             const marginRight = 20;
-            const marginTop   = 24;
-            const rowHeight   = 42;
-            const dotR        = 4;
-            const axisH       = 36;
+            const marginTop   = 30;
+            const rowHeight   = 120;   // ~1.5 inches at typical screen dpi
+            const dotR        = 2.5;   // smaller dots — up to 800 members per row
+            const jitterRange = rowHeight / 2 - dotR - 8;  // max vertical offset from row centre
+            const axisH       = 40;
             const totalW      = 860;
             const totalH      = marginTop + ISSUES.length * rowHeight + axisH;
 
@@ -469,16 +470,18 @@
 
             ISSUES.forEach(({ label }, i) => {
                 const y = marginTop + i * rowHeight;
-                if (i % 2 === 0) {
-                    const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    stripe.setAttribute('x', 0); stripe.setAttribute('y', y);
-                    stripe.setAttribute('width', totalW); stripe.setAttribute('height', rowHeight);
-                    stripe.setAttribute('fill', 'rgba(0,0,0,0.025)');
-                    svg.insertBefore(stripe, bgRect);
-                }
+
+                // Row divider line
+                const divider = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                divider.setAttribute('x1', 0); divider.setAttribute('x2', totalW);
+                divider.setAttribute('y1', y); divider.setAttribute('y2', y);
+                divider.setAttribute('stroke', '#e0e0e0'); divider.setAttribute('stroke-width', '1');
+                svg.appendChild(divider);
+
+                // Issue label — vertically centred in the taller row
                 const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                lbl.setAttribute('x', marginLeft - 10); lbl.setAttribute('y', y + rowHeight / 2 + 4);
-                lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '12'); lbl.setAttribute('fill', '#444');
+                lbl.setAttribute('x', marginLeft - 10); lbl.setAttribute('y', y + rowHeight / 2 + 5);
+                lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '13'); lbl.setAttribute('fill', '#444');
                 lbl.textContent = label; svg.appendChild(lbl);
             });
 
@@ -488,11 +491,15 @@
                 scores.forEach((score, issueIdx) => {
                     if (score === null) return;
                     const cx = scoreToX(score);
-                    const cy = marginTop + issueIdx * rowHeight + rowHeight / 2;
+                    // Random vertical jitter, bounded within the row (same each render per member
+                    // since Math.random() is called once per circle creation)
+                    const jitter = (Math.random() * 2 - 1) * jitterRange;
+                    const cy = marginTop + issueIdx * rowHeight + rowHeight / 2 + jitter;
+
                     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                     circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
                     circle.setAttribute('r', dotR); circle.setAttribute('fill', color);
-                    circle.setAttribute('fill-opacity', '0.55'); circle.setAttribute('stroke', 'none');
+                    circle.setAttribute('fill-opacity', '0.6'); circle.setAttribute('stroke', 'none');
                     circle.style.cursor = 'pointer';
                     circle.addEventListener('mouseenter', function(e) {
                         this.setAttribute('r', dotR + 3); this.setAttribute('fill-opacity', '1');
@@ -507,7 +514,7 @@
                         tooltip.style.top  = (e.clientY - 32) + 'px';
                     });
                     circle.addEventListener('mouseleave', function() {
-                        this.setAttribute('r', dotR); this.setAttribute('fill-opacity', '0.55');
+                        this.setAttribute('r', dotR); this.setAttribute('fill-opacity', '0.6');
                         this.setAttribute('stroke', 'none'); tooltip.style.display = 'none';
                     });
                     svg.appendChild(circle);
