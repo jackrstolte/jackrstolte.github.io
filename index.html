@@ -424,7 +424,8 @@
             svg.setAttribute('height', totalH);
 
             const plotW = totalW - marginLeft - marginRight;
-            const scoreToX = score => marginLeft + ((score + 100) / 200) * plotW;
+            // Domain is -105..105 to accommodate ±5 horizontal jitter
+            const scoreToX = score => marginLeft + ((score + 105) / 210) * plotW;
 
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
             defs.innerHTML = `
@@ -490,11 +491,8 @@
                 const color  = PARTY_COLOR[member.party] || '#888';
                 scores.forEach((score, issueIdx) => {
                     if (score === null) return;
-                    // Horizontal: scores pinned at ±100 get a small inward jitter so
-                    // they don't all stack on the same vertical line.
-                    let displayScore = score;
-                    if (score === -100) displayScore = -100 + Math.random() * 10;  // -100 → -90
-                    if (score ===  100) displayScore =   90 + Math.random() * 10;  //   90 → 100
+                    // Horizontal jitter ±5 for all dots
+                    const displayScore = score + (Math.random() * 2 - 1) * 5;
                     const cx = scoreToX(displayScore);
 
                     // Vertical jitter, bounded within the row
