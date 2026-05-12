@@ -1,6 +1,4 @@
 """
-partisan_checker.py
---------------------
 Processes congress_data.csv by:
   1. Keeping only the most recent vote per (bill_id, chamber) pair.
   2. Classifying each remaining vote group as partisan or nonpartisan
@@ -9,7 +7,7 @@ Processes congress_data.csv by:
   3. Moving classified rows out of congress_data.csv and into
      partisan_votes.csv or nonpartisan_votes.csv.
 
-File layout (relative to this script):
+File layout (relative to this file):
     data/congress_data.csv
     data/partisan_votes.csv
     data/nonpartisan_votes.csv
@@ -18,7 +16,7 @@ File layout (relative to this script):
 import os
 import pandas as pd
 
-# ── Path helpers ─────────────────────────────────────────────────────────────
+# Paths
 
 _SRC_DIR  = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.join(_SRC_DIR, "data")
@@ -28,7 +26,7 @@ PARTISAN_PATH        = os.path.join(_DATA_DIR, "partisan_votes.csv")
 NONPARTISAN_PATH     = os.path.join(_DATA_DIR, "nonpartisan_votes.csv")
 
 
-# ── Vote-ID ordering ─────────────────────────────────────────────────────────
+# Order by vote id
 
 def _vote_id_sort_key(vote_id: str) -> int:
     """
@@ -46,7 +44,7 @@ def _vote_id_sort_key(vote_id: str) -> int:
         return -1
 
 
-# ── Partisanship logic ───────────────────────────────────────────────────────
+# Determine partisanship
 
 def _majority_vote(series: pd.Series) -> str | None:
     """
@@ -67,19 +65,22 @@ def _classify_group(group: pd.DataFrame) -> tuple:
     """
     Classify a single (bill_id, chamber) vote group.
 
-    Returns
-    -------
-    (is_partisan, generic_d_vote, generic_r_vote)
+    Returns (is_partisan, generic_d_vote, generic_r_vote) to eventually become
+    columns in the data/partisan_scores.csv file
 
     Rules
     -----
     - Only "D" and "R" members are considered; others (e.g. Independents)
       are excluded from the majority calculation.
+    - I know Kevin Kiley (former Republican from California) just became an Independent,
+    but pretty much all of our data with proper Independents who remain that way are
+    just Bernie Sanders (Vermont) and Angus King (Maine), who have both always been 
+    Independents who caucus with the Democratic party
     - Only "Yea" and "Nay" votes count; "Not Voting", "Present", etc. are
       excluded.
     - If either party has a tied majority (or no eligible voters), the group
       is treated as nonpartisan (is_partisan=False).
-    - Partisan = Democrat majority != Republican majority.
+    - Partisan means Democrat majority != Republican majority.
     """
     eligible = group[group["vote"].isin(["Yea", "Nay"])]
 
@@ -97,7 +98,7 @@ def _classify_group(group: pd.DataFrame) -> tuple:
     return is_partisan, dem_majority, rep_majority
 
 
-# ── Main function ─────────────────────────────────────────────────────────────
+# Vote processing
 
 def process_votes() -> None:
     """
@@ -107,14 +108,13 @@ def process_votes() -> None:
     congress_data.csv with the classified rows removed.
     """
 
-    # ── 1. Load ──────────────────────────────────────────────────────────────
-    df = pd.read_csv(CONGRESS_DATA_PATH)
+    df = pd.read_csv(CONGRESS_DATA_PATH) # load the data
 
-    # Strip any accidental BOM from the first column header
+    # Strip any accidental byte order marks (BOM) from the first column header
     df.columns = [c.lstrip("\ufeff").strip() for c in df.columns]
 
-    # ── 2. Keep only the most recent vote per (bill_id, chamber, congress) ──────
-    #
+    # Keep only the most recent vote per (bill_id, chamber, congress)
+    
     # Grouping by congress ensures that e.g. HR 1 from the 117th and HR 1 from
     # the 118th are treated as distinct bills and each get their own most-recent
     # vote retained.
@@ -131,12 +131,14 @@ def process_votes() -> None:
 
     # Rows that belong to older vote_ids — these get removed from the main
     # CSV but are NOT written to partisan/nonpartisan (they're simply dropped).
+    # This is because they might be stuff like amendments that aren't the final
+    # version of the bill, which is what we really care about!
     df_old = df[df["_vote_num"] != latest].copy()
 
     # Drop the helper column before writing anything.
     df_latest = df_latest.drop(columns=["_vote_num"])
 
-    # ── 3. Classify each (bill_id, chamber) group ────────────────────────────
+    # Classify each (bill_id, chamber) group 
     partisan_rows    = []
     nonpartisan_rows = []
 
@@ -153,8 +155,8 @@ def process_votes() -> None:
     partisan_df    = pd.concat(partisan_rows)    if partisan_rows    else pd.DataFrame(columns=df_latest.columns)
     nonpartisan_df = pd.concat(nonpartisan_rows) if nonpartisan_rows else pd.DataFrame(columns=df_latest.columns)
 
-    # ── 4. Append to output CSVs ─────────────────────────────────────────────
-    #
+    # Append to output CSVs 
+    
     # Append (write header only if the file does not yet exist).
     for path, data in [(PARTISAN_PATH, partisan_df), (NONPARTISAN_PATH, nonpartisan_df)]:
         if data.empty:
@@ -162,8 +164,8 @@ def process_votes() -> None:
         write_header = not os.path.exists(path)
         data.to_csv(path, mode="a", index=False, header=write_header)
 
-    # ── 5. Rewrite congress_data.csv with classified rows removed ────────────
-    #
+    # Rewrite congress_data.csv with classified rows removed 
+    
     # Build a set of (bill_id, chamber, vote_id) tuples that were classified
     # so we can filter them out.
     classified_keys = set(
@@ -191,7 +193,7 @@ def process_votes() -> None:
 
     df_remaining.to_csv(CONGRESS_DATA_PATH, index=False)
 
-    # ── 6. Summary ───────────────────────────────────────────────────────────
+    # Summary generation
     n_partisan    = len(partisan_df["vote_id"].unique())    if not partisan_df.empty    else 0
     n_nonpartisan = len(nonpartisan_df["vote_id"].unique()) if not nonpartisan_df.empty else 0
 
@@ -201,7 +203,7 @@ def process_votes() -> None:
     print(f"  Rows remaining in congress_data.csv: {len(df_remaining)}")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# if name equals main
 
 if __name__ == "__main__":
     process_votes()

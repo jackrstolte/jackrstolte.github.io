@@ -221,7 +221,7 @@
     <div id="dpTooltip"></div>
 
     <script>
-        // ── Issue label → CSV column prefix mapping ───────────────────────────
+        // Issue label → CSV column prefix mapping
         const ISSUES = [
             { label: "Immigration",                col: "Immigration"                },
             { label: "Healthcare",                 col: "Healthcare"                 },
@@ -238,7 +238,7 @@
 
         const PARTY_COLOR = { D: "#3a86ff", R: "#ef233c" };
 
-        // ── CSV parser ────────────────────────────────────────────────────────
+        // CSV parser 
         function parseCSV(text) {
             const lines   = text.trim().split("\n");
             const headers = lines[0].split(",").map(h => h.trim().replace(/^\uFEFF/, ""));
@@ -250,7 +250,7 @@
             });
         }
 
-        // ── Per-issue final scores for one member (null = no votes) ───────────
+        // Per-issue final scores for one member (null = no votes) 
         function memberScores(row) {
             return ISSUES.map(({ col }) => {
                 const totals = parseFloat(row[`${col}_vote_totals`]);
@@ -259,7 +259,7 @@
             });
         }
 
-        // ── Chart 1: Horizontal bar chart ─────────────────────────────────────
+        // Horizontal bar chart 
         const ctx = document.getElementById('scoreChart').getContext('2d');
         let currentChart;
 
@@ -299,7 +299,7 @@
             });
         }
 
-        // ── Search box ────────────────────────────────────────────────────────
+        // Search box 
         function initSearch(members) {
             const input    = document.getElementById('memberSearch');
             const dropdown = document.getElementById('searchDropdown');
@@ -405,7 +405,7 @@
             selectMember(members[0]);
         }
 
-        // ── Chart 2: Dot / Strip Plot (SVG) ───────────────────────────────────
+        // Dot / Strip Plot (SVG) 
         function buildDotPlot(members) {
             const svg     = document.getElementById('dotPlotSvg');
             const tooltip = document.getElementById('dpTooltip');
@@ -525,7 +525,7 @@
             });
         }
 
-        // ── Bootstrap ─────────────────────────────────────────────────────────
+        // Bootstrap 
         (async function init() {
             let members;
             try {

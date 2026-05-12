@@ -1,11 +1,8 @@
 """
-score_calculator.py
---------------------
 Processes partisan_votes.csv to produce partisanship scores for every
 member of Congress across 11 issue categories.
 
-Steps
------
+Steps:
 1. For each unique (congress, bill_id) in partisan_votes.csv, look up the
    AI-assigned issue category from classified_bills.csv. Bills not found in
    classified_bills.csv are assigned "Miscellaneous" and a warning is printed.
@@ -16,8 +13,7 @@ Steps
 3. Recompute mean_score and final_score for the affected issue column.
 4. Move every processed row from partisan_votes.csv to processed_votes.csv.
 
-Score formula
--------------
+Score formula:
   mean_score  = total_score / vote_totals          (range 0..1)
   final_score = (mean_score * 200) - 100           (range -100..+100)
   -100 = always votes with Democrats
@@ -33,7 +29,7 @@ File layout (relative to this script):
 import os
 import pandas as pd
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# Paths
 
 _ROOT_DIR          = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR          = os.path.join(_ROOT_DIR, "data")
@@ -43,7 +39,7 @@ PARTISAN_PATH      = os.path.join(_DATA_DIR, "partisan_votes.csv")
 PROCESSED_PATH     = os.path.join(_DATA_DIR, "processed_votes.csv")
 SCORES_PATH        = os.path.join(_DATA_DIR, "scores.csv")
 
-# ── Issue categories ──────────────────────────────────────────────────────────
+# Issue categories
 
 ISSUES = [
     "Immigration",
@@ -87,7 +83,7 @@ for _issue in ISSUES:
 SCORES_COLUMNS = ["member", "bioguide_id", "party", "state"] + SCORE_COLS
 
 
-# ── Step 1: Assign AI issue labels ────────────────────────────────────────────
+# Assign AI issue labels 
 
 def assign_issue_labels(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -145,7 +141,7 @@ def assign_issue_labels(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── Step 2 & 3: Score accumulation ───────────────────────────────────────────
+# Control scores loading, load members, add new members, and scores updating
 
 def _load_scores() -> pd.DataFrame:
     """Load scores.csv if it exists, otherwise return an empty template."""
@@ -201,7 +197,7 @@ def _update_score(scores: pd.DataFrame, row: pd.Series) -> pd.DataFrame:
     issue       = row.get("Issue")
 
     if member_vote not in (d_vote, r_vote):
-        return scores   # abstention – skip
+        return scores   # abstention means skip
 
     score_increment = 1 if member_vote == r_vote else 0
 
@@ -228,7 +224,7 @@ def _update_score(scores: pd.DataFrame, row: pd.Series) -> pd.DataFrame:
     return scores
 
 
-# ── Main function ─────────────────────────────────────────────────────────────
+# Calculate the scores
 
 def calculate_scores() -> None:
     """
@@ -239,7 +235,7 @@ def calculate_scores() -> None:
       4. Clear processed rows from partisan_votes.csv.
     """
 
-    # ── Load ─────────────────────────────────────────────────────────────────
+    # Loading step
     if not os.path.exists(PARTISAN_PATH):
         print("partisan_votes.csv not found – nothing to process.")
         return
@@ -251,12 +247,12 @@ def calculate_scores() -> None:
         print("partisan_votes.csv is empty – nothing to process.")
         return
 
-    # ── Step 1: Issue labels from classified_bills.csv ───────────────────────
+    # Purloin issue labels from classified_bills.csv 
     partisan_df = assign_issue_labels(partisan_df)
     # Persist labels immediately so a crash mid-run doesn't lose them.
     partisan_df.to_csv(PARTISAN_PATH, index=False)
 
-    # ── Step 2 & 3: Score accumulation ───────────────────────────────────────
+    # Collect scores
     scores = _load_scores()
     processed_rows = []
 
@@ -265,10 +261,10 @@ def calculate_scores() -> None:
         scores = _update_score(scores, vote_row)
         processed_rows.append(vote_row)
 
-    # ── Save scores.csv ───────────────────────────────────────────────────────
+    # Saving scores.csv 
     scores.to_csv(SCORES_PATH, index=False)
 
-    # ── Step 4: Move processed rows to processed_votes.csv ───────────────────
+    # Move processed rows to processed_votes.csv 
     if processed_rows:
         processed_df = pd.DataFrame(processed_rows)
         write_header = not os.path.exists(PROCESSED_PATH)
@@ -277,14 +273,14 @@ def calculate_scores() -> None:
     # Clear partisan_votes.csv (keep header, remove all rows)
     pd.DataFrame(columns=partisan_df.columns).to_csv(PARTISAN_PATH, index=False)
 
-    # ── Summary ───────────────────────────────────────────────────────────────
+    # Summary generation
     print("Done.")
     print(f"  Votes processed                   : {len(processed_rows)}")
     print(f"  Members in scores.csv             : {len(scores)}")
     print(f"  Rows moved to processed_votes.csv : {len(processed_rows)}")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# if name equals main
 
 if __name__ == "__main__":
     calculate_scores()
