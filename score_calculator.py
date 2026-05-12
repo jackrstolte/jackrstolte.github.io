@@ -6,9 +6,9 @@ member of Congress across 11 issue categories.
 
 Steps
 -----
-1. For each unique bill_id in partisan_votes.csv that does not yet have an
-   "Issue" label, assign one at random. (Placeholder until an AI classifier
-   replaces this step.)
+1. For each unique (congress, bill_id) in partisan_votes.csv, look up the
+   AI-assigned issue category from classified_bills.csv. Bills not found in
+   classified_bills.csv are assigned "Miscellaneous" and a warning is printed.
 2. Row by row, accumulate scores into scores.csv:
      - vote == generic_d_vote  ->  add 0 to issue total_score, +1 to vote_totals
      - vote == generic_r_vote  ->  add 1 to issue total_score, +1 to vote_totals
@@ -24,23 +24,24 @@ Score formula
   +100 = always votes with Republicans
 
 File layout (relative to this script):
+    classified_bills.csv          <- AI classifications (congress, bill_id_clean, predicted_category)
     data/partisan_votes.csv
     data/processed_votes.csv
     data/scores.csv
 """
 
 import os
-import random
 import pandas as pd
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-_ROOT_DIR         = os.path.dirname(os.path.abspath(__file__))
-_DATA_DIR         = os.path.join(_ROOT_DIR, "data")
+_ROOT_DIR          = os.path.dirname(os.path.abspath(__file__))
+_DATA_DIR          = os.path.join(_ROOT_DIR, "data")
 
-PARTISAN_PATH     = os.path.join(_DATA_DIR, "partisan_votes.csv")
-PROCESSED_PATH    = os.path.join(_DATA_DIR, "processed_votes.csv")
-SCORES_PATH       = os.path.join(_DATA_DIR, "scores.csv")
+CLASSIFIED_PATH    = os.path.join(_ROOT_DIR, "classified_bills.csv")
+PARTISAN_PATH      = os.path.join(_DATA_DIR, "partisan_votes.csv")
+PROCESSED_PATH     = os.path.join(_DATA_DIR, "processed_votes.csv")
+SCORES_PATH        = os.path.join(_DATA_DIR, "scores.csv")
 
 # ── Issue categories ──────────────────────────────────────────────────────────
 
@@ -86,29 +87,61 @@ for _issue in ISSUES:
 SCORES_COLUMNS = ["member", "bioguide_id", "party", "state"] + SCORE_COLS
 
 
-# ── Step 1: Assign random issue labels ───────────────────────────────────────
+# ── Step 1: Assign AI issue labels ────────────────────────────────────────────
 
 def assign_issue_labels(df: pd.DataFrame) -> pd.DataFrame:
     """
-    For every unique bill_id that lacks an Issue label, assign one at random.
-    All rows sharing a bill_id get the same label.
+    For every unique (congress, bill_id) in df, look up the predicted_category
+    from classified_bills.csv.  The join is on:
+        partisan_votes.congress  == classified_bills.congress
+        partisan_votes.bill_id   == classified_bills.bill_id_clean
+
+    Bills with no match are assigned "Miscellaneous" and logged as warnings.
+    Bills that already have an Issue label (from a prior partial run) are
+    left unchanged.
     """
     if "Issue" not in df.columns:
         df["Issue"] = None
 
-    # Build a mapping for bill_ids that already have a label (from prior runs)
-    existing = (
-        df[df["Issue"].notna()]
-        .drop_duplicates("bill_id")
-        .set_index("bill_id")["Issue"]
+    # Load AI classifications
+    if not os.path.exists(CLASSIFIED_PATH):
+        print(f"WARNING: {CLASSIFIED_PATH} not found. All bills will be labelled 'Miscellaneous'.")
+        df["Issue"] = df["Issue"].fillna("Miscellaneous")
+        return df
+
+    classified = pd.read_csv(CLASSIFIED_PATH)
+    classified.columns = [c.lstrip("\ufeff").strip() for c in classified.columns]
+
+    # Build lookup: (congress, bill_id_clean) -> predicted_category
+    lookup = (
+        classified
+        .drop_duplicates(subset=["congress", "bill_id_clean"])
+        .set_index(["congress", "bill_id_clean"])["predicted_category"]
         .to_dict()
     )
 
-    unlabeled_bills = df.loc[df["Issue"].isna(), "bill_id"].unique()
-    for bill_id in unlabeled_bills:
-        existing[bill_id] = random.choice(ISSUES)
+    # Only fill rows that don't already have a label
+    needs_label = df["Issue"].isna()
+    unmatched = set()
 
-    df["Issue"] = df["bill_id"].map(existing)
+    def _lookup(row):
+        if not needs_label[row.name]:
+            return row["Issue"]
+        key = (row["congress"], row["bill_id"])
+        category = lookup.get(key)
+        if category is None:
+            unmatched.add(key)
+            return "Miscellaneous"
+        return category
+
+    df["Issue"] = df.apply(_lookup, axis=1)
+
+    if unmatched:
+        print(f"WARNING: {len(unmatched)} (congress, bill_id) pair(s) not found in "
+              f"classified_bills.csv — assigned 'Miscellaneous':")
+        for key in sorted(unmatched):
+            print(f"  congress={key[0]}, bill_id={key[1]}")
+
     return df
 
 
@@ -122,7 +155,7 @@ def _load_scores() -> pd.DataFrame:
 
 
 def _member_key(row: pd.Series) -> str:
-    """Unique identifier for a member (name is sufficient; bioguide_id if present)."""
+    """Unique identifier for a member (bioguide_id if present, else name)."""
     if pd.notna(row.get("bioguide_id")):
         return str(row["bioguide_id"])
     return str(row["member"])
@@ -200,7 +233,7 @@ def _update_score(scores: pd.DataFrame, row: pd.Series) -> pd.DataFrame:
 def calculate_scores() -> None:
     """
     Full pipeline:
-      1. Assign Issue labels to any unlabeled bills in partisan_votes.csv.
+      1. Assign AI Issue labels to any unlabeled bills in partisan_votes.csv.
       2. Process every vote row, updating scores.csv.
       3. Move all processed rows to processed_votes.csv.
       4. Clear processed rows from partisan_votes.csv.
@@ -218,10 +251,9 @@ def calculate_scores() -> None:
         print("partisan_votes.csv is empty – nothing to process.")
         return
 
-    # ── Step 1: Issue labels ─────────────────────────────────────────────────
+    # ── Step 1: Issue labels from classified_bills.csv ───────────────────────
     partisan_df = assign_issue_labels(partisan_df)
-    # Persist the newly assigned labels immediately so a crash mid-run doesn't
-    # lose them.
+    # Persist labels immediately so a crash mid-run doesn't lose them.
     partisan_df.to_csv(PARTISAN_PATH, index=False)
 
     # ── Step 2 & 3: Score accumulation ───────────────────────────────────────
@@ -247,8 +279,8 @@ def calculate_scores() -> None:
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print("Done.")
-    print(f"  Votes processed         : {len(processed_rows)}")
-    print(f"  Members in scores.csv   : {len(scores)}")
+    print(f"  Votes processed                   : {len(processed_rows)}")
+    print(f"  Members in scores.csv             : {len(scores)}")
     print(f"  Rows moved to processed_votes.csv : {len(processed_rows)}")
 
 
