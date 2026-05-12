@@ -490,9 +490,14 @@
                 const color  = PARTY_COLOR[member.party] || '#888';
                 scores.forEach((score, issueIdx) => {
                     if (score === null) return;
-                    const cx = scoreToX(score);
-                    // Random vertical jitter, bounded within the row (same each render per member
-                    // since Math.random() is called once per circle creation)
+                    // Horizontal: scores pinned at ±100 get a small inward jitter so
+                    // they don't all stack on the same vertical line.
+                    let displayScore = score;
+                    if (score === -100) displayScore = -100 + Math.random() * 10;  // -100 → -90
+                    if (score ===  100) displayScore =   90 + Math.random() * 10;  //   90 → 100
+                    const cx = scoreToX(displayScore);
+
+                    // Vertical jitter, bounded within the row
                     const jitter = (Math.random() * 2 - 1) * jitterRange;
                     const cy = marginTop + issueIdx * rowHeight + rowHeight / 2 + jitter;
 
