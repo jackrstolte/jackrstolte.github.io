@@ -31,8 +31,7 @@ jobs:
             requests \
             python-dotenv \
             beautifulsoup4 \
-            lxml \
-            transformers 
+            lxml
 
       - name: Run pipeline
         run: python main.py
