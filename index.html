@@ -23,13 +23,6 @@
             justify-content: center;
             margin-bottom: 20px;
         }
-        select {
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            min-width: 280px;
-        }
         .chart-container {
             background: white;
             padding: 20px;
@@ -60,6 +53,73 @@
         }
         .hidden { display: none; }
 
+        /* ── Search box ── */
+        .search-wrapper {
+            position: relative;
+            width: 340px;
+        }
+        #memberSearch {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        #memberSearch:focus {
+            border-color: #6a9fd8;
+            box-shadow: 0 0 0 3px rgba(106,159,216,0.18);
+        }
+        #searchDropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            max-height: 260px;
+            overflow-y: auto;
+            z-index: 500;
+            display: none;
+        }
+        .search-option {
+            padding: 9px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .search-option:last-child { border-bottom: none; }
+        .search-option:hover,
+        .search-option.active { background: #f0f6ff; }
+        .party-badge {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .party-D { background: #ddeeff; color: #1a5fa8; }
+        .party-R { background: #fde8e8; color: #b91c1c; }
+        .search-no-results {
+            padding: 10px 14px;
+            color: #999;
+            font-size: 14px;
+            font-style: italic;
+        }
+        .search-hint {
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
         /* Dot Plot */
         #dotPlotWrapper {
             background: white;
@@ -68,10 +128,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             overflow-x: auto;
         }
-        #dotPlotSvg {
-            display: block;
-            width: 100%;
-        }
+        #dotPlotSvg { display: block; width: 100%; }
 
         /* Tooltip */
         #dpTooltip {
@@ -119,22 +176,31 @@
 
     <div id="loadingMsg">Loading data&hellip;</div>
 
-    <!-- Hidden until CSV loads successfully -->
     <div id="mainContent" class="hidden">
 
         <!-- Chart 1: Individual Bar Chart -->
         <div class="section-title">Individual Score Breakdown</div>
-        <div class="section-subtitle">Select a member to view their scores by issue. Issues with no recorded votes are omitted.</div>
+        <div class="section-subtitle">Search by name, state, party, or ID. Issues with no recorded votes are omitted.</div>
 
         <div class="controls">
-            <select id="congressSelect"></select>
+            <div class="search-wrapper">
+                <input
+                    type="text"
+                    id="memberSearch"
+                    placeholder="Search members&hellip;"
+                    autocomplete="off"
+                    spellcheck="false"
+                />
+                <div id="searchDropdown"></div>
+                <div class="search-hint" id="searchHint"></div>
+            </div>
         </div>
 
         <div class="chart-container">
             <canvas id="scoreChart"></canvas>
         </div>
 
-        <!-- Chart 2: All-Member Dot Plot -->
+        <!-- Chart 2: Dot Plot -->
         <div class="section-title">All Members by Issue</div>
         <div class="section-subtitle">Each dot is one member of Congress. Hover for details. Members without votes on an issue are not plotted for that issue.</div>
 
@@ -156,9 +222,6 @@
 
     <script>
         // ── Issue label → CSV column prefix mapping ───────────────────────────
-        //
-        // Column names in scores.csv are produced by score_calculator.py's
-        // _col() helper, which replaces / ( ) and spaces with underscores.
         const ISSUES = [
             { label: "Immigration",                col: "Immigration"                },
             { label: "Healthcare",                 col: "Healthcare"                 },
@@ -175,7 +238,7 @@
 
         const PARTY_COLOR = { D: "#3a86ff", R: "#ef233c" };
 
-        // ── Simple CSV parser ─────────────────────────────────────────────────
+        // ── CSV parser ────────────────────────────────────────────────────────
         function parseCSV(text) {
             const lines   = text.trim().split("\n");
             const headers = lines[0].split(",").map(h => h.trim().replace(/^\uFEFF/, ""));
@@ -187,10 +250,7 @@
             });
         }
 
-        // ── Extract per-issue final scores for one member ─────────────────────
-        //
-        // Returns an array parallel to ISSUES.
-        // null means vote_totals == 0 for that issue → no score, no bar/dot.
+        // ── Per-issue final scores for one member (null = no votes) ───────────
         function memberScores(row) {
             return ISSUES.map(({ col }) => {
                 const totals = parseFloat(row[`${col}_vote_totals`]);
@@ -205,10 +265,8 @@
 
         function renderBarChart(scores) {
             if (currentChart) currentChart.destroy();
-
             const bgColors     = scores.map(s => s === null ? 'transparent' : s < 0 ? 'rgba(54,162,235,0.7)' : 'rgba(255,99,132,0.7)');
             const borderColors = scores.map(s => s === null ? 'transparent' : s < 0 ? 'rgba(54,162,235,1)'   : 'rgba(255,99,132,1)');
-
             currentChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -224,12 +282,7 @@
                 options: {
                     indexAxis: 'y',
                     responsive: true,
-                    scales: {
-                        x: {
-                            min: -100, max: 100,
-                            title: { display: true, text: 'Ideological Score' }
-                        }
-                    },
+                    scales: { x: { min: -100, max: 100, title: { display: true, text: 'Ideological Score' } } },
                     plugins: {
                         tooltip: {
                             callbacks: {
@@ -246,6 +299,112 @@
             });
         }
 
+        // ── Search box ────────────────────────────────────────────────────────
+        function initSearch(members) {
+            const input    = document.getElementById('memberSearch');
+            const dropdown = document.getElementById('searchDropdown');
+            const hint     = document.getElementById('searchHint');
+            let activeIdx  = -1;
+            let filtered   = [];
+
+            // Show selected member's name in the input
+            function selectMember(m) {
+                input.value = `${m.member} (${m.party}-${m.state})`;
+                dropdown.style.display = 'none';
+                hint.textContent = '';
+                renderBarChart(memberScores(m));
+            }
+
+            // Build dropdown items from a filtered list
+            function renderDropdown(list) {
+                dropdown.innerHTML = '';
+                activeIdx = -1;
+                if (list.length === 0) {
+                    dropdown.innerHTML = '<div class="search-no-results">No results found</div>';
+                    dropdown.style.display = 'block';
+                    return;
+                }
+                list.forEach((m, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'search-option';
+                    item.innerHTML = `
+                        <span class="party-badge party-${m.party}">${m.party}</span>
+                        <span>${m.member} &mdash; ${m.state}${m.bioguide_id ? ' <span style="color:#aaa;font-size:12px;">'+m.bioguide_id+'</span>' : ''}</span>
+                    `;
+                    item.addEventListener('mousedown', e => {
+                        e.preventDefault();   // don't blur input before click fires
+                        selectMember(m);
+                    });
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+            }
+
+            // Searchable string for a member — all fields a user might type
+            function searchText(m) {
+                return [m.member, m.party, m.state, m.bioguide_id || '']
+                    .join(' ').toLowerCase();
+            }
+
+            input.addEventListener('input', () => {
+                const q = input.value.trim().toLowerCase();
+                if (!q) {
+                    dropdown.style.display = 'none';
+                    hint.textContent = '';
+                    return;
+                }
+                // Match members where every space-separated token appears somewhere
+                const tokens = q.split(/\s+/);
+                filtered = members.filter(m => {
+                    const txt = searchText(m);
+                    return tokens.every(t => txt.includes(t));
+                });
+                hint.textContent = filtered.length
+                    ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`
+                    : '';
+                renderDropdown(filtered);
+            });
+
+            // Keyboard navigation
+            input.addEventListener('keydown', e => {
+                const items = dropdown.querySelectorAll('.search-option');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIdx = Math.min(activeIdx + 1, items.length - 1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIdx = Math.max(activeIdx - 1, 0);
+                } else if (e.key === 'Enter') {
+                    if (activeIdx >= 0 && filtered[activeIdx]) selectMember(filtered[activeIdx]);
+                    return;
+                } else if (e.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+                items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+                if (items[activeIdx]) items[activeIdx].scrollIntoView({ block: 'nearest' });
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', e => {
+                if (!e.target.closest('.search-wrapper')) {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            // Show full list on focus if input is empty
+            input.addEventListener('focus', () => {
+                if (!input.value.trim()) {
+                    filtered = members;
+                    renderDropdown(members.slice(0, 50));   // cap at 50 for initial open
+                    hint.textContent = `${members.length} members total`;
+                }
+            });
+
+            // Initialize bar chart with first member
+            selectMember(members[0]);
+        }
+
         // ── Chart 2: Dot / Strip Plot (SVG) ───────────────────────────────────
         function buildDotPlot(members) {
             const svg     = document.getElementById('dotPlotSvg');
@@ -255,22 +414,17 @@
             const marginRight = 20;
             const marginTop   = 24;
             const rowHeight   = 42;
-            const dotR        = 4;    // small radius — up to 535 members per row
+            const dotR        = 4;
             const axisH       = 36;
-
-            const totalW = 860;
-            const totalH = marginTop + ISSUES.length * rowHeight + axisH;
+            const totalW      = 860;
+            const totalH      = marginTop + ISSUES.length * rowHeight + axisH;
 
             svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
             svg.setAttribute('height', totalH);
 
             const plotW = totalW - marginLeft - marginRight;
+            const scoreToX = score => marginLeft + ((score + 100) / 200) * plotW;
 
-            function scoreToX(score) {
-                return marginLeft + ((score + 100) / 200) * plotW;
-            }
-
-            // Gradient
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
             defs.innerHTML = `
                 <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -281,104 +435,68 @@
             svg.appendChild(defs);
 
             const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            bgRect.setAttribute('x', marginLeft);
-            bgRect.setAttribute('y', marginTop);
-            bgRect.setAttribute('width', plotW);
-            bgRect.setAttribute('height', ISSUES.length * rowHeight);
+            bgRect.setAttribute('x', marginLeft); bgRect.setAttribute('y', marginTop);
+            bgRect.setAttribute('width', plotW); bgRect.setAttribute('height', ISSUES.length * rowHeight);
             bgRect.setAttribute('fill', 'url(#bgGrad)');
             svg.appendChild(bgRect);
 
-            // Gridlines & tick labels
             [-100, -75, -50, -25, 0, 25, 50, 75, 100].forEach(val => {
                 const x = scoreToX(val);
-
                 const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 line.setAttribute('x1', x); line.setAttribute('x2', x);
-                line.setAttribute('y1', marginTop);
-                line.setAttribute('y2', marginTop + ISSUES.length * rowHeight);
+                line.setAttribute('y1', marginTop); line.setAttribute('y2', marginTop + ISSUES.length * rowHeight);
                 line.setAttribute('stroke', val === 0 ? '#999' : '#ddd');
                 line.setAttribute('stroke-width', val === 0 ? 1.5 : 1);
                 line.setAttribute('stroke-dasharray', val === 0 ? '4,3' : '');
                 svg.appendChild(line);
 
                 const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                lbl.setAttribute('x', x);
-                lbl.setAttribute('y', marginTop + ISSUES.length * rowHeight + 18);
-                lbl.setAttribute('text-anchor', 'middle');
-                lbl.setAttribute('font-size', '11');
-                lbl.setAttribute('fill', '#666');
+                lbl.setAttribute('x', x); lbl.setAttribute('y', marginTop + ISSUES.length * rowHeight + 18);
+                lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '11'); lbl.setAttribute('fill', '#666');
                 lbl.textContent = val;
                 svg.appendChild(lbl);
             });
 
-            // Axis endpoint labels
-            const lblD = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            lblD.setAttribute('x', marginLeft);
-            lblD.setAttribute('y', marginTop + ISSUES.length * rowHeight + 34);
-            lblD.setAttribute('text-anchor', 'start');
-            lblD.setAttribute('font-size', '11');
-            lblD.setAttribute('fill', '#3a86ff');
-            lblD.textContent = '\u2190 Democrat';
-            svg.appendChild(lblD);
+            const mkEndLabel = (x, anchor, color, text, y) => {
+                const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                el.setAttribute('x', x); el.setAttribute('y', y);
+                el.setAttribute('text-anchor', anchor); el.setAttribute('font-size', '11'); el.setAttribute('fill', color);
+                el.textContent = text; svg.appendChild(el);
+            };
+            const axisY = marginTop + ISSUES.length * rowHeight + 34;
+            mkEndLabel(marginLeft, 'start', '#3a86ff', '\u2190 Democrat', axisY);
+            mkEndLabel(marginLeft + plotW, 'end', '#ef233c', 'Republican \u2192', axisY);
 
-            const lblR = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            lblR.setAttribute('x', marginLeft + plotW);
-            lblR.setAttribute('y', marginTop + ISSUES.length * rowHeight + 34);
-            lblR.setAttribute('text-anchor', 'end');
-            lblR.setAttribute('font-size', '11');
-            lblR.setAttribute('fill', '#ef233c');
-            lblR.textContent = 'Republican \u2192';
-            svg.appendChild(lblR);
-
-            // Row stripes + issue labels
             ISSUES.forEach(({ label }, i) => {
                 const y = marginTop + i * rowHeight;
-
                 if (i % 2 === 0) {
                     const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    stripe.setAttribute('x', 0);
-                    stripe.setAttribute('y', y);
-                    stripe.setAttribute('width', totalW);
-                    stripe.setAttribute('height', rowHeight);
+                    stripe.setAttribute('x', 0); stripe.setAttribute('y', y);
+                    stripe.setAttribute('width', totalW); stripe.setAttribute('height', rowHeight);
                     stripe.setAttribute('fill', 'rgba(0,0,0,0.025)');
                     svg.insertBefore(stripe, bgRect);
                 }
-
                 const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                lbl.setAttribute('x', marginLeft - 10);
-                lbl.setAttribute('y', y + rowHeight / 2 + 4);
-                lbl.setAttribute('text-anchor', 'end');
-                lbl.setAttribute('font-size', '12');
-                lbl.setAttribute('fill', '#444');
-                lbl.textContent = label;
-                svg.appendChild(lbl);
+                lbl.setAttribute('x', marginLeft - 10); lbl.setAttribute('y', y + rowHeight / 2 + 4);
+                lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '12'); lbl.setAttribute('fill', '#444');
+                lbl.textContent = label; svg.appendChild(lbl);
             });
 
-            // Dots — skipped entirely when score is null
             members.forEach(member => {
                 const scores = memberScores(member);
                 const color  = PARTY_COLOR[member.party] || '#888';
-
                 scores.forEach((score, issueIdx) => {
-                    if (score === null) return;   // no votes on this issue → no dot
-
+                    if (score === null) return;
                     const cx = scoreToX(score);
                     const cy = marginTop + issueIdx * rowHeight + rowHeight / 2;
-
                     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', cx);
-                    circle.setAttribute('cy', cy);
-                    circle.setAttribute('r', dotR);
-                    circle.setAttribute('fill', color);
-                    circle.setAttribute('fill-opacity', '0.55');
-                    circle.setAttribute('stroke', 'none');
+                    circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+                    circle.setAttribute('r', dotR); circle.setAttribute('fill', color);
+                    circle.setAttribute('fill-opacity', '0.55'); circle.setAttribute('stroke', 'none');
                     circle.style.cursor = 'pointer';
-
                     circle.addEventListener('mouseenter', function(e) {
-                        this.setAttribute('r', dotR + 3);
-                        this.setAttribute('fill-opacity', '1');
-                        this.setAttribute('stroke', '#fff');
-                        this.setAttribute('stroke-width', '1.5');
+                        this.setAttribute('r', dotR + 3); this.setAttribute('fill-opacity', '1');
+                        this.setAttribute('stroke', '#fff'); this.setAttribute('stroke-width', '1.5');
                         const side    = score < 0 ? 'Left' : score > 0 ? 'Right' : 'Center';
                         const display = score >= 0 ? `+${score.toFixed(1)}` : score.toFixed(1);
                         tooltip.textContent = `${member.member} (${member.party}-${member.state}) \u2014 ${ISSUES[issueIdx].label}: ${display} (${side})`;
@@ -389,22 +507,19 @@
                         tooltip.style.top  = (e.clientY - 32) + 'px';
                     });
                     circle.addEventListener('mouseleave', function() {
-                        this.setAttribute('r', dotR);
-                        this.setAttribute('fill-opacity', '0.55');
-                        this.setAttribute('stroke', 'none');
-                        tooltip.style.display = 'none';
+                        this.setAttribute('r', dotR); this.setAttribute('fill-opacity', '0.55');
+                        this.setAttribute('stroke', 'none'); tooltip.style.display = 'none';
                     });
-
                     svg.appendChild(circle);
                 });
             });
         }
 
-        // ── Bootstrap: fetch CSV, wire everything up ──────────────────────────
+        // ── Bootstrap ─────────────────────────────────────────────────────────
         (async function init() {
             let members;
             try {
-                const res = await fetch('data/scores.csv');
+                const res = await fetch(`data/scores.csv?t=${Date.now()}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 members = parseCSV(await res.text());
             } catch (err) {
@@ -414,28 +529,13 @@
                 return;
             }
 
-            // Sort alphabetically by last name
             members.sort((a, b) => {
                 const lastA = a.member.trim().split(' ').pop();
                 const lastB = b.member.trim().split(' ').pop();
                 return lastA.localeCompare(lastB);
             });
 
-            // Populate dropdown
-            const select = document.getElementById('congressSelect');
-            members.forEach((m, idx) => {
-                const opt       = document.createElement('option');
-                opt.value       = idx;
-                opt.textContent = `${m.member} (${m.party}-${m.state})`;
-                select.appendChild(opt);
-            });
-
-            // Initial render
-            renderBarChart(memberScores(members[0]));
-            select.addEventListener('change', e => {
-                renderBarChart(memberScores(members[+e.target.value]));
-            });
-
+            initSearch(members);
             buildDotPlot(members);
 
             document.getElementById('loadingMsg').classList.add('hidden');
