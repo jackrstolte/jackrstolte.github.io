@@ -170,7 +170,7 @@ def _ensure_member(scores: pd.DataFrame, row: pd.Series) -> pd.DataFrame:
     )
     if not mask.any():
         new_row = {col: 0 for col in SCORE_COLS}
-        new_row["member"]      = row.get("member", "")
+        new_row["member"]      = str(row.get("member", "")).replace(",", "")
         new_row["bioguide_id"] = row.get("bioguide_id", None)
         new_row["party"]       = row.get("party", "")
         new_row["state"]       = row.get("state", "")
